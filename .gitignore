@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# 환경/비밀
+.env
+*.db
+selfdeploy.db
+
+# OS/IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Android
+android-collector/build/
+android-collector/.gradle/
+*.apk
