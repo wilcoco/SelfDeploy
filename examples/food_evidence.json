@@ -1,0 +1,24 @@
+{
+  "_comment": "한 식품가공 공장이 실제로 기록하는 것. 입출고 로트는 ERP에 있지만, CCP 측정과 배합 로트 연결은 종이/작업자 머릿속이다.",
+  "signals": [
+    {
+      "id": "ERP.incoming_lot",
+      "kind": "data",
+      "tags": ["incoming_lot"],
+      "description": "입고 원재료 로트 (ERP 입고 전표)"
+    },
+    {
+      "id": "ERP.finished_lot",
+      "kind": "data",
+      "tags": ["finished_lot"],
+      "description": "완제품 로트 부여 (ERP 생산 실적)"
+    },
+    {
+      "id": "MANUAL.haccp_plan",
+      "kind": "claim",
+      "tags": ["ccp_catalog"],
+      "description": "CCP·한계기준이 HACCP 계획서에 문장으로만 있음"
+    }
+  ],
+  "judgment_owners": {}
+}

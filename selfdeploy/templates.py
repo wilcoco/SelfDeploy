@@ -202,6 +202,100 @@ INJECTION_MOLDING = VerticalTemplate(
 )
 
 
+# --------------------------------------------------------------------------- #
+# Second vertical: food manufacturing (식품가공)
+#
+# Proves Kind-B amortization: a different vertical is a different measurement
+# grammar authored once — the IR, grounding gate, forced questions, dual-speed
+# classifier, and decay are all unchanged. The hidden layer differs (CCP
+# measurements and batch lot-links live in a worker's head / on paper), so the
+# *same* engine surfaces a *different* set of red cells.
+# --------------------------------------------------------------------------- #
+
+_SANITATION = KpiTemplate(
+    key="sanitation_compliance",
+    label="위생 점검 준수율 / sanitation (HACCP) compliance",
+    aliases=["위생", "점검", "haccp", "ccp", "sanitation"],
+    root=Spec(
+        key="sanitation_compliance",
+        label="위생 준수율 = 준수 점검 / 전체 점검",
+        kind=NodeKind.KPI,
+        requires=[
+            Spec(
+                key="ccp_definition",
+                label="중요관리점(CCP)과 한계기준 정의",
+                kind=NodeKind.DEFINITION,
+                grounding_tags=["ccp_catalog"],
+            ),
+            Spec(
+                key="ccp_check_event",
+                label="CCP 점검이 실제로 수행됨",
+                kind=NodeKind.EVENT,
+                requires=[
+                    Spec(
+                        key="ccp_record",
+                        label="CCP 측정값 기록 (온도·시간, 타임스탬프)",
+                        kind=NodeKind.RECORD,
+                        grounding_tags=["ccp_log"],
+                        freshness=1.0,  # 매 배치/교대 갱신 — 오래되면 부식
+                    ),
+                    Spec(
+                        key="deviation_call",
+                        label="한계 근처 이탈 판정 (감으로) — 사람 루프",
+                        kind=NodeKind.JUDGMENT,
+                        grounding_tags=["ccp_borderline"],
+                    ),
+                ],
+            ),
+            Spec(
+                key="corrective_action_record",
+                label="이탈 시 조치 기록 — 흔히 은닉층",
+                kind=NodeKind.RECORD,
+                grounding_tags=["corrective_log"],
+            ),
+        ],
+    ),
+)
+
+_TRACEABILITY = KpiTemplate(
+    key="lot_traceability",
+    label="원재료 추적성 / raw-material lot traceability",
+    aliases=["추적", "로트", "traceability", "이력", "lot"],
+    root=Spec(
+        key="lot_traceability",
+        label="추적성 = 역추적 가능 로트 / 전체 로트",
+        kind=NodeKind.KPI,
+        requires=[
+            Spec(
+                key="incoming_lot",
+                label="입고 원재료 로트 기록",
+                kind=NodeKind.RECORD,
+                grounding_tags=["incoming_lot"],
+            ),
+            Spec(
+                key="batch_link",
+                label="배합 단계 투입 로트 연결 — 흔히 작업자 머릿속(은닉층)",
+                kind=NodeKind.RECORD,
+                grounding_tags=["batch_link"],
+            ),
+            Spec(
+                key="finished_lot",
+                label="완제품 로트 부여·연결",
+                kind=NodeKind.RECORD,
+                grounding_tags=["finished_lot"],
+            ),
+        ],
+    ),
+)
+
+
+FOOD_MANUFACTURING = VerticalTemplate(
+    name="food_manufacturing",
+    kpis={t.key: t for t in (_SANITATION, _TRACEABILITY)},
+)
+
+
 VERTICALS: dict[str, VerticalTemplate] = {
     INJECTION_MOLDING.name: INJECTION_MOLDING,
+    FOOD_MANUFACTURING.name: FOOD_MANUFACTURING,
 }
