@@ -64,6 +64,7 @@ def load_evidence(path: Path) -> Evidence:
             kind=s.get("kind", "data"),
             tags=s.get("tags", []),
             description=s.get("description", ""),
+            as_of=s.get("as_of"),
         )
         for s in data.get("signals", [])
     ]
@@ -87,7 +88,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
 
     graph = build_graph(requirement, vertical, _mapper(args))
-    ground(graph, evidence)
+    ground(graph, evidence, as_of=args.as_of)
 
     print(text_report(graph))
 
@@ -191,6 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--evidence-file")
     analyze.add_argument("--html", help="write an HTML gap map to this path")
     analyze.add_argument("--llm", action="store_true", help="use Claude to map requirement->KPIs (needs ANTHROPIC creds)")
+    analyze.add_argument("--as-of", type=float, default=None, help="evaluation time (tick); stale data groundings decay to UNVERIFIED")
     analyze.set_defaults(func=cmd_analyze)
 
     questions = sub.add_parser("questions", help="forced questions generated from red cells")

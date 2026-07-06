@@ -74,6 +74,7 @@ class Contract:
     kind: NodeKind
     requires: list[str] = field(default_factory=list)   # child contract ids (entailment)
     grounding_tags: list[str] = field(default_factory=list)  # tags an evidence signal must share to ground this
+    freshness: Optional[float] = None  # max age of a data grounding before it decays to UNVERIFIED (None = never stales)
     # Populated by the grounding pass:
     provenance: Provenance = Provenance.DOMAIN_INFERRED
     grade: Optional[Grade] = None

@@ -25,6 +25,7 @@ class Spec:
     kind: NodeKind
     grounding_tags: list[str] = field(default_factory=list)
     requires: list["Spec"] = field(default_factory=list)
+    freshness: float | None = None  # max age before a data grounding decays (None = never)
 
 
 @dataclass
@@ -66,6 +67,7 @@ def expand(kpi: KpiTemplate, prefix: str) -> ContractGraph:
                 kind=spec.kind,
                 requires=child_ids,
                 grounding_tags=list(spec.grounding_tags),
+                freshness=spec.freshness,
                 provenance=Provenance.DOMAIN_INFERRED,
             )
         )
@@ -124,6 +126,7 @@ _DEFECT_RATE = KpiTemplate(
                 label="라인·교대별 생산 수 (분모)",
                 kind=NodeKind.RECORD,
                 grounding_tags=["production_count"],
+                freshness=1.0,  # 교대(shift)마다 갱신돼야 함 — 오래되면 부식
             ),
             Spec(
                 key="disposition_record",

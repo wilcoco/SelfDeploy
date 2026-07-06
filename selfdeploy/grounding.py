@@ -31,6 +31,7 @@ class Signal:
     kind: str                 # "data" (recorded/queryable) or "claim" (stated only, e.g. in a manual)
     tags: list[str] = field(default_factory=list)
     description: str = ""
+    as_of: float | None = None  # when this data was last observed (numeric tick; None = timeless)
 
 
 @dataclass
@@ -59,7 +60,7 @@ class Evidence:
         return None
 
 
-def _direct_grade(node: Contract, evidence: Evidence) -> Grade | None:
+def _direct_grade(node: Contract, evidence: Evidence, as_of: float | None) -> Grade | None:
     """Grade from this node's *own* evidence, ignoring children. None if it has no tags."""
     if node.kind == NodeKind.JUDGMENT:
         owner = evidence.owner_for(node.grounding_tags)
@@ -78,6 +79,15 @@ def _direct_grade(node: Contract, evidence: Evidence) -> Grade | None:
     kind, sig = evidence.match(node.grounding_tags)
     if kind == "data":
         node.provenance = Provenance.LOG_DERIVED
+        if (
+            node.freshness is not None
+            and as_of is not None
+            and sig.as_of is not None
+            and (as_of - sig.as_of) > node.freshness
+        ):
+            age = as_of - sig.as_of
+            node.note = f"데이터 부식: {sig.id} 마지막 확인 후 {age:g} > 신선도 {node.freshness:g} — 재확인 필요"
+            return Grade.UNVERIFIED
         node.note = f"데이터로 착지: {sig.id}"
         return Grade.VERIFIED
     if kind == "claim":
@@ -90,18 +100,23 @@ def _direct_grade(node: Contract, evidence: Evidence) -> Grade | None:
     return Grade.RED
 
 
-def ground(graph: ContractGraph, evidence: Evidence) -> ContractGraph:
-    """Compute and store a grade on every contract. Returns the same graph."""
+def ground(graph: ContractGraph, evidence: Evidence, as_of: float | None = None) -> ContractGraph:
+    """Compute and store a grade on every contract. Returns the same graph.
+
+    ``as_of`` is the evaluation time (a numeric tick). When set, data groundings
+    older than their contract's ``freshness`` decay VERIFIED -> UNVERIFIED — the
+    self-maintaining substrate: a number nobody re-confirms stops being trusted.
+    """
 
     def compute(node_id: str) -> Grade:
         node = graph.get(node_id)
         if node.kind == NodeKind.JUDGMENT:
-            grade = _direct_grade(node, evidence)
+            grade = _direct_grade(node, evidence, as_of)
             node.grade = grade
             return grade
 
         child_grades = [compute(cid) for cid in node.requires]
-        direct = _direct_grade(node, evidence)
+        direct = _direct_grade(node, evidence, as_of)
 
         candidates = list(child_grades)
         if direct is not None:
