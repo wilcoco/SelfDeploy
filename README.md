@@ -36,15 +36,41 @@ Palantir식 FDE는 SMB에게 비용 부담이 크다. SelfDeploy는 그 역할�
 
 ## 실행
 
+**1) 간극 지도 — 요구를 착지시켜 은닉층을 빨간 칸으로:**
 ```bash
 python -m selfdeploy analyze \
-  --vertical injection_molding \
   --requirement-file examples/requirement.txt \
   --evidence-file examples/injection_molding_evidence.json \
   --html out.html
+# --llm 을 붙이면 요구→KPI 매핑을 Claude(opus-4-8)가 함(결정론 게이트로 감쌈). 없으면 오프라인 키워드 매핑.
 ```
 
 예제 시나리오: 공장은 생산 수·설비 로그·출하 기록은 **데이터로** 갖고 있지만, **검사 기록·불량 처리 기록은 없다**(반장 머릿속/종이). 그래서 "불량률을 실시간으로 보고 싶다"는 요구는 예쁜 대시보드로 끝나는 게 아니라 — 불량률 KPI가 `RED`로 떨어지고, 정확히 그 은닉층(검사·처리 기록)이 빨간 칸으로 뜬다. 반면 가동중단은 데이터로 착지하되 사유 분류가 반장 판단(`JUDGMENT`)임이 드러난다.
+
+**2) 강제 질문 — 빨간 칸을 타입 미닫힘에서 자동 생성한 질문으로:**
+```bash
+python -m selfdeploy questions \
+  --requirement-file examples/requirement.txt \
+  --evidence-file examples/injection_molding_evidence.json
+```
+"승인"이 아니라 "빨간 칸 채우기". 질문은 LLM 직감이 아니라 `missing_record / claim_only / unowned_judgment / unknown_requirement` 분류에서 결정론적으로 나온다.
+
+**3) 빨간 칸 채우기 — 답변→재착지 살아있는 루프:**
+```bash
+python -m selfdeploy interview \
+  --requirement-file examples/requirement.txt \
+  --evidence-file examples/injection_molding_evidence.json \
+  --answers-file examples/answers.json
+```
+담당자가 빨간 칸을 채우면 red 밀도가 떨어지고, KPI가 `RED`→`UNVERIFIED`로(약속했으나 데이터 미확인, 정직하게) 이동한다.
+
+**4) 이중 속도 — 변화가 상시입력인지 재설계인지 타입으로 판정:**
+```bash
+# 트랩 케이스: 검사 데이터처럼 보이지만 새 처리경로를 실은 신호 → 승급 판정
+echo '{"id":"QC.new","kind":"data","tags":["inspection_log","repaint_route"]}' \
+  | python -m selfdeploy classify --requirement-file examples/requirement.txt --signal-file /dev/stdin
+```
+`상시 입력(가벼운 게이트)` / `승급 판정(사람 결정)` / `재설계(무거운 게이트)` 세 갈래. 빠른 맥박과 느린 맥박 사이를 타입 닫힘이 지킨다.
 
 ## 테스트
 
@@ -52,6 +78,20 @@ python -m selfdeploy analyze \
 python -m pytest -q
 ```
 
+## 모듈
+
+- `ir.py` — 컨트랙트 그래프 IR (provenance/grade 1급)
+- `templates.py` — Kind-B 측정 문법 (사출 시드)
+- `decompose.py` — 요구 → 당위 하부구조
+- `grounding.py` — 결정론 착지 게이트 + red 밀도
+- `interview.py` — 강제 질문 → 답변 → 재착지 (Kind-A 추출)
+- `evolve.py` — 이중 속도 판정 (상시입력/승급/재설계)
+- `llm.py` — 선택적 Claude 요구→KPI 매퍼 (격리된 비결정성 단계)
+- `report.py` — 텍스트/HTML 간극 지도
+- `cli.py` — analyze / questions / interview / classify
+
 ## 상태
 
-v0 스캐폴드. 지금 있는 것: IR, 사출 시드 템플릿, 결정론 착지 게이트, 간극 지도. 다음: 증거 자동 수집(계측/ERP·MES 탭), Kind-A 추출 강제 함수(빨간 칸 → 강제 질문), 살아있는 SoT(신뢰 등급의 시간적 획득/상실).
+v0 스캐폴드, 28 테스트 통과. 있는 것: IR, 사출 시드 템플릿, 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 선택적 LLM 매핑.
+
+다음: 증거 자동 수집(계측/ERP·MES 탭 = 콜드스타트 (i) 통합 플레이), 신뢰 등급의 *시간적* 획득/상실(오래된 VERIFIED가 재확인 없으면 UNVERIFIED로 부식), 둘째 업종 문법(Kind-B 분할상각 실증).

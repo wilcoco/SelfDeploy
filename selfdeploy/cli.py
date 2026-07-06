@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from .decompose import build_graph
+from .evolve import classify_requirement, classify_signal
 from .grounding import Evidence, Signal, ground
 from .interview import Answer, generate_questions, run_round
 from .report import html_report, text_report
@@ -145,6 +146,40 @@ def cmd_interview(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_classify(args: argparse.Namespace) -> int:
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    requirement = _read_requirement(args)
+    if requirement is None:
+        print("provide --requirement or --requirement-file (the current model)", file=sys.stderr)
+        return 2
+    graph = build_graph(requirement, vertical, _mapper(args))
+
+    if args.signal_file:
+        data = json.loads(Path(args.signal_file).read_text(encoding="utf-8"))
+        signal = Signal(id=data["id"], kind=data.get("kind", "data"), tags=data.get("tags", []))
+        verdict = classify_signal(graph, signal)
+        subject = f"신호 {signal.id} (tags: {signal.tags})"
+    elif args.new_requirement:
+        verdict = classify_requirement(args.new_requirement, vertical, graph)
+        subject = f"새 요구: {args.new_requirement}"
+    else:
+        print("provide --signal-file or --new-requirement", file=sys.stderr)
+        return 2
+
+    speed_ko = {"continuous": "상시 입력 (가벼운 게이트)", "promote": "승급 판정 (사람 결정)", "redesign": "재설계 (무거운 게이트)"}
+    print(f"{subject}")
+    print(f"  → {speed_ko.get(verdict.speed, verdict.speed)}")
+    print(f"  이유: {verdict.reason}")
+    if verdict.matched_tags:
+        print(f"  기존 계약과 맞는 태그: {verdict.matched_tags}")
+    if verdict.novel_tags:
+        print(f"  새 태그: {verdict.novel_tags}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -175,6 +210,15 @@ def build_parser() -> argparse.ArgumentParser:
     interview.add_argument("--html")
     interview.add_argument("--llm", action="store_true")
     interview.set_defaults(func=cmd_interview)
+
+    classify = sub.add_parser("classify", help="dual-speed: is a change 상시입력 or 재설계?")
+    classify.add_argument("--vertical", default="injection_molding")
+    classify.add_argument("--requirement", help="the current model's requirement")
+    classify.add_argument("--requirement-file")
+    classify.add_argument("--signal-file", help="a new evidence signal JSON {id,kind,tags}")
+    classify.add_argument("--new-requirement", help="a new manager requirement to classify")
+    classify.add_argument("--llm", action="store_true")
+    classify.set_defaults(func=cmd_classify)
     return parser
 
 

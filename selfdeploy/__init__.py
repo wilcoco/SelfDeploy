@@ -13,6 +13,7 @@ Public surface:
     VERTICALS     the Kind-B measurement grammars
 """
 from .decompose import build_graph
+from .evolve import CONTINUOUS, PROMOTE, REDESIGN, Verdict, classify_requirement, classify_signal
 from .grounding import Evidence, Metrics, Signal, ground, metrics
 from .interview import Answer, Question, apply_answers, generate_questions, run_round
 from .ir import Contract, ContractGraph, Grade, NodeKind, Provenance
@@ -42,6 +43,12 @@ __all__ = [
     "apply_answers",
     "run_round",
     "ClaudeRequirementMapper",
+    "classify_signal",
+    "classify_requirement",
+    "Verdict",
+    "CONTINUOUS",
+    "PROMOTE",
+    "REDESIGN",
 ]
 
 __version__ = "0.0.1"
