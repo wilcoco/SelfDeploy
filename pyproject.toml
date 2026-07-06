@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "selfdeploy"
+version = "0.0.1"
+description = "Ought-first measurement-grounding engine — a low-cost FDE stand-in for SMBs"
+requires-python = ">=3.10"
+readme = "README.md"
+
+[project.scripts]
+selfdeploy = "selfdeploy.cli:main"
+
+[tool.setuptools]
+packages = ["selfdeploy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

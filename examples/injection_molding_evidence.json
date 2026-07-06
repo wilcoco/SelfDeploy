@@ -1,0 +1,44 @@
+{
+  "_comment": "한 사출 공장이 '실제로 기록하는 것'의 인벤토리. kind=data 는 조회 가능한 기록(강), kind=claim 은 매뉴얼에 적혀만 있고 데이터 뒷받침이 없는 주장(약).",
+  "signals": [
+    {
+      "id": "MES.production_count",
+      "kind": "data",
+      "tags": ["production_count"],
+      "description": "라인·교대별 생산 수량 (MES 집계)"
+    },
+    {
+      "id": "PLC.cycle_log",
+      "kind": "data",
+      "tags": ["machine_state"],
+      "description": "사출기 사이클/상태 로그 (PLC)"
+    },
+    {
+      "id": "MES.downtime_log",
+      "kind": "data",
+      "tags": ["downtime_log", "machine_state"],
+      "description": "정지 시작/종료 타임스탬프"
+    },
+    {
+      "id": "ERP.order_due",
+      "kind": "data",
+      "tags": ["order_due"],
+      "description": "주문별 약속 납기일"
+    },
+    {
+      "id": "ERP.shipment_log",
+      "kind": "data",
+      "tags": ["shipment_log"],
+      "description": "출하 이벤트 타임스탬프"
+    },
+    {
+      "id": "MANUAL.defect_spec",
+      "kind": "claim",
+      "tags": ["defect_catalog"],
+      "description": "불량 기준이 도장 작업표준서에 문장으로만 적혀 있음 (데이터화 안 됨)"
+    }
+  ],
+  "judgment_owners": {
+    "stop_reason": "생산반장"
+  }
+}
