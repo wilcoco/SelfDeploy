@@ -19,8 +19,31 @@ from pathlib import Path
 
 from .decompose import build_graph
 from .grounding import Evidence, Signal, ground
+from .interview import Answer, generate_questions, run_round
 from .report import html_report, text_report
 from .templates import VERTICALS
+
+
+def _read_requirement(args: argparse.Namespace) -> str | None:
+    if getattr(args, "requirement_file", None):
+        return Path(args.requirement_file).read_text(encoding="utf-8")
+    if getattr(args, "requirement", None):
+        return args.requirement
+    return None
+
+
+def load_answers(path: Path) -> list[Answer]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        Answer(
+            contract_id=a["contract_id"],
+            signal_id=a.get("signal_id"),
+            data=a.get("data", False),
+            owner=a.get("owner"),
+            description=a.get("description", ""),
+        )
+        for a in data.get("answers", [])
+    ]
 
 
 def load_evidence(path: Path) -> Evidence:
@@ -64,6 +87,55 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_questions(args: argparse.Namespace) -> int:
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    requirement = _read_requirement(args)
+    if requirement is None:
+        print("provide --requirement or --requirement-file", file=sys.stderr)
+        return 2
+    evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+    graph = ground(build_graph(requirement, vertical), evidence)
+    questions = generate_questions(graph)
+    if not questions:
+        print("빨간 칸 없음 — 모든 계약이 착지했다.")
+        return 0
+    print(f"강제 질문 {len(questions)}개 (타입 미닫힘에서 자동 생성):\n")
+    for i, q in enumerate(questions, 1):
+        print(f"[{i}] ({q.gap}) {q.label}")
+        print(f"    Q: {q.prompt}")
+        print(f"    닫힘 조건: {q.closes_with}\n")
+    return 0
+
+
+def cmd_interview(args: argparse.Namespace) -> int:
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    requirement = _read_requirement(args)
+    if requirement is None:
+        print("provide --requirement or --requirement-file", file=sys.stderr)
+        return 2
+    evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+    answers = load_answers(Path(args.answers_file)) if args.answers_file else []
+
+    graph, new_evidence, rnd = run_round(requirement, vertical, evidence, answers)
+
+    print("빨간 칸 채우기 라운드 / interview round")
+    print(f"  before: red {rnd.before.red}  (밀도 {rnd.before.red_density:.0%})")
+    print(f"  적용한 답변: {len(answers)}개")
+    print(f"  after : red {rnd.after.red}  (밀도 {rnd.after.red_density:.0%})   → 닫은 빨간 칸: {rnd.red_closed}")
+    print()
+    print(text_report(graph))
+    if args.html:
+        Path(args.html).write_text(html_report(graph), encoding="utf-8")
+        print(f"\nHTML gap map -> {args.html}", file=sys.stderr)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -75,6 +147,22 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--evidence-file")
     analyze.add_argument("--html", help="write an HTML gap map to this path")
     analyze.set_defaults(func=cmd_analyze)
+
+    questions = sub.add_parser("questions", help="forced questions generated from red cells")
+    questions.add_argument("--vertical", default="injection_molding")
+    questions.add_argument("--requirement")
+    questions.add_argument("--requirement-file")
+    questions.add_argument("--evidence-file")
+    questions.set_defaults(func=cmd_questions)
+
+    interview = sub.add_parser("interview", help="apply answers to red cells and re-ground")
+    interview.add_argument("--vertical", default="injection_molding")
+    interview.add_argument("--requirement")
+    interview.add_argument("--requirement-file")
+    interview.add_argument("--evidence-file")
+    interview.add_argument("--answers-file")
+    interview.add_argument("--html")
+    interview.set_defaults(func=cmd_interview)
     return parser
 
 

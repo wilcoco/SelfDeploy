@@ -1,0 +1,27 @@
+{
+  "_comment": "담당자가 빨간 칸을 채운 답변. signal_id + data=true 는 실제 데이터로 착지(검증), data 생략/false 는 '남기겠다'는 계획(미검증). owner 는 사람 판단 담당 지정.",
+  "answers": [
+    {
+      "contract_id": "kpi:defect_rate:inspection_record",
+      "signal_id": "QC.tablet_input",
+      "data": false,
+      "description": "검사원이 태블릿에 합/불을 입력하도록 공정에 게이트 신설(예정) — 아직 데이터 없음"
+    },
+    {
+      "contract_id": "kpi:defect_rate:disposition_record",
+      "signal_id": "MES.disposition",
+      "data": true,
+      "description": "불량품 리워크/폐기 처리를 MES에 이미 기록 중"
+    },
+    {
+      "contract_id": "kpi:defect_rate:borderline_call",
+      "owner": "품질검사원"
+    },
+    {
+      "contract_id": "kpi:defect_rate:defect_definition",
+      "signal_id": "QC.defect_checklist",
+      "data": true,
+      "description": "불량 기준을 사진 체크리스트로 데이터화"
+    }
+  ]
+}

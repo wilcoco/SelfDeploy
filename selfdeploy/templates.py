@@ -97,8 +97,7 @@ _DEFECT_RATE = KpiTemplate(
             Spec(
                 key="inspection_event",
                 label="검사가 실제로 수행됨 (정의된 공정에서)",
-                kind=NodeKind.EVENT,
-                grounding_tags=["inspection_station"],
+                kind=NodeKind.EVENT,  # structural: grounded by its record existing
                 requires=[
                     Spec(
                         key="inspection_record",
@@ -148,8 +147,7 @@ _DOWNTIME = KpiTemplate(
             Spec(
                 key="stop_event",
                 label="정지 이벤트가 발생·감지됨",
-                kind=NodeKind.EVENT,
-                grounding_tags=["machine_state"],
+                kind=NodeKind.EVENT,  # structural: grounded by its record existing
                 requires=[
                     Spec(
                         key="stop_record",
