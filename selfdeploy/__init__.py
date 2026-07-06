@@ -14,7 +14,9 @@ Public surface:
 """
 from .decompose import build_graph
 from .grounding import Evidence, Metrics, Signal, ground, metrics
+from .interview import Answer, Question, apply_answers, generate_questions, run_round
 from .ir import Contract, ContractGraph, Grade, NodeKind, Provenance
+from .llm import ClaudeRequirementMapper
 from .report import html_report, text_report
 from .templates import VERTICALS, VerticalTemplate
 
@@ -34,6 +36,12 @@ __all__ = [
     "html_report",
     "VERTICALS",
     "VerticalTemplate",
+    "Answer",
+    "Question",
+    "generate_questions",
+    "apply_answers",
+    "run_round",
+    "ClaudeRequirementMapper",
 ]
 
 __version__ = "0.0.1"

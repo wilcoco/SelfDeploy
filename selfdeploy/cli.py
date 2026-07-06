@@ -24,6 +24,15 @@ from .report import html_report, text_report
 from .templates import VERTICALS
 
 
+def _mapper(args: argparse.Namespace):
+    """Build the optional Claude requirement mapper, or None for deterministic matching."""
+    if getattr(args, "llm", False):
+        from .llm import ClaudeRequirementMapper
+
+        return ClaudeRequirementMapper()
+    return None
+
+
 def _read_requirement(args: argparse.Namespace) -> str | None:
     if getattr(args, "requirement_file", None):
         return Path(args.requirement_file).read_text(encoding="utf-8")
@@ -76,7 +85,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
 
     evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
 
-    graph = build_graph(requirement, vertical)
+    graph = build_graph(requirement, vertical, _mapper(args))
     ground(graph, evidence)
 
     print(text_report(graph))
@@ -97,7 +106,7 @@ def cmd_questions(args: argparse.Namespace) -> int:
         print("provide --requirement or --requirement-file", file=sys.stderr)
         return 2
     evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
-    graph = ground(build_graph(requirement, vertical), evidence)
+    graph = ground(build_graph(requirement, vertical, _mapper(args)), evidence)
     questions = generate_questions(graph)
     if not questions:
         print("빨간 칸 없음 — 모든 계약이 착지했다.")
@@ -122,7 +131,7 @@ def cmd_interview(args: argparse.Namespace) -> int:
     evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
     answers = load_answers(Path(args.answers_file)) if args.answers_file else []
 
-    graph, new_evidence, rnd = run_round(requirement, vertical, evidence, answers)
+    graph, new_evidence, rnd = run_round(requirement, vertical, evidence, answers, _mapper(args))
 
     print("빨간 칸 채우기 라운드 / interview round")
     print(f"  before: red {rnd.before.red}  (밀도 {rnd.before.red_density:.0%})")
@@ -146,6 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--requirement-file")
     analyze.add_argument("--evidence-file")
     analyze.add_argument("--html", help="write an HTML gap map to this path")
+    analyze.add_argument("--llm", action="store_true", help="use Claude to map requirement->KPIs (needs ANTHROPIC creds)")
     analyze.set_defaults(func=cmd_analyze)
 
     questions = sub.add_parser("questions", help="forced questions generated from red cells")
@@ -153,6 +163,7 @@ def build_parser() -> argparse.ArgumentParser:
     questions.add_argument("--requirement")
     questions.add_argument("--requirement-file")
     questions.add_argument("--evidence-file")
+    questions.add_argument("--llm", action="store_true")
     questions.set_defaults(func=cmd_questions)
 
     interview = sub.add_parser("interview", help="apply answers to red cells and re-ground")
@@ -162,6 +173,7 @@ def build_parser() -> argparse.ArgumentParser:
     interview.add_argument("--evidence-file")
     interview.add_argument("--answers-file")
     interview.add_argument("--html")
+    interview.add_argument("--llm", action="store_true")
     interview.set_defaults(func=cmd_interview)
     return parser
 

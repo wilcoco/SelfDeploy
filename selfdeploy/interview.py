@@ -176,15 +176,16 @@ def run_round(
     vertical: VerticalTemplate,
     evidence: Evidence,
     answers: list[Answer],
+    mapper=None,
 ) -> tuple[ContractGraph, Evidence, Round]:
     """Ground, generate questions, apply answers, re-ground — returns the new state.
 
     The graph is rebuilt from the (pure) requirement each grounding so no stale
     grade/provenance leaks between rounds.
     """
-    g0 = ground(build_graph(requirement, vertical), evidence)
+    g0 = ground(build_graph(requirement, vertical, mapper), evidence)
     q0 = generate_questions(g0)
     new_evidence = apply_answers(evidence, g0, answers)
-    g1 = ground(build_graph(requirement, vertical), new_evidence)
+    g1 = ground(build_graph(requirement, vertical, mapper), new_evidence)
     q1 = generate_questions(g1)
     return g1, new_evidence, Round(metrics(g0), metrics(g1), q0, q1)
