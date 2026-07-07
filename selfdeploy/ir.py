@@ -21,6 +21,7 @@ class NodeKind(str, Enum):
     """What role a contract plays in the entailment tree."""
 
     REQUIREMENT = "requirement"   # the executive's raw ask (apex)
+    OBLIGATION = "obligation"     # something the company is *accountable* for (safety, brand, legal)
     KPI = "kpi"                   # a concrete, measurable target
     DEFINITION = "definition"     # what a term means (e.g. "what counts as a defect")
     EVENT = "event"               # something that must happen (e.g. inspection occurs)
@@ -65,6 +66,13 @@ def worst(grades: list[Grade]) -> Grade:
     return max(grades, key=lambda g: g.severity)
 
 
+# Blast-radius levels (0..1) — the consequence if a control fails.
+CATASTROPHIC = 1.0   # safety/life, recall, regulatory shutdown
+SEVERE = 0.75        # brand crisis, large liability
+MODERATE = 0.5       # financial loss, delivery incident
+MINOR = 0.25         # local inefficiency (default)
+
+
 @dataclass
 class Contract:
     """A node in the contract graph."""
@@ -75,6 +83,7 @@ class Contract:
     requires: list[str] = field(default_factory=list)   # child contract ids (entailment)
     grounding_tags: list[str] = field(default_factory=list)  # tags an evidence signal must share to ground this
     freshness: Optional[float] = None  # max age of a data grounding before it decays to UNVERIFIED (None = never stales)
+    severity: float = 0.25  # blast-radius if this goes wrong (0..1); a leaf inherits the worst of its ancestors
     # Populated by the grounding pass:
     provenance: Provenance = Provenance.DOMAIN_INFERRED
     grade: Optional[Grade] = None

@@ -65,3 +65,26 @@ def build_graph(
         root.requires.append(unknown.id)
 
     return graph
+
+
+def build_obligation_graph(vertical: VerticalTemplate) -> ContractGraph:
+    """Instantiate the whole accountability surface — every obligation the company bears.
+
+    Unlike build_graph (driven by a manager's ask), this is driven by what a company
+    of this type is *accountable for*, whether or not anyone asked. These are the risks
+    that reach the CEO invisibly until they detonate.
+    """
+    graph = ContractGraph(root_id="obl:root")
+    root = Contract(
+        id="obl:root",
+        label=f"{vertical.name} 책임 표면 (대표 리스크)",
+        kind=NodeKind.OBLIGATION,
+        severity=0.0,  # neutral container — each obligation carries its own blast radius
+        provenance=Provenance.DOMAIN_INFERRED,
+    )
+    graph.add(root)
+    for key, tmpl in vertical.obligations.items():
+        sub = expand(tmpl, prefix=f"obl:{key}")
+        graph.merge(sub)
+        root.requires.append(sub.root_id)
+    return graph

@@ -13,7 +13,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .ir import Contract, ContractGraph, NodeKind, Provenance
+from .ir import (
+    CATASTROPHIC,
+    MODERATE,
+    SEVERE,
+    Contract,
+    ContractGraph,
+    NodeKind,
+    Provenance,
+)
 
 
 @dataclass
@@ -26,6 +34,7 @@ class Spec:
     grounding_tags: list[str] = field(default_factory=list)
     requires: list["Spec"] = field(default_factory=list)
     freshness: float | None = None  # max age before a data grounding decays (None = never)
+    severity: float = 0.25  # blast-radius (0..1); obligations set high, controls inherit
 
 
 @dataclass
@@ -40,6 +49,7 @@ class KpiTemplate:
 class VerticalTemplate:
     name: str
     kpis: dict[str, KpiTemplate]
+    obligations: dict[str, KpiTemplate] = field(default_factory=dict)  # what the company is accountable for
 
     def match(self, requirement_text: str) -> list[str]:
         """Deterministic requirement→KPI mapping by alias keywords."""
@@ -68,6 +78,7 @@ def expand(kpi: KpiTemplate, prefix: str) -> ContractGraph:
                 requires=child_ids,
                 grounding_tags=list(spec.grounding_tags),
                 freshness=spec.freshness,
+                severity=spec.severity,
                 provenance=Provenance.DOMAIN_INFERRED,
             )
         )
@@ -196,9 +207,47 @@ _ON_TIME = KpiTemplate(
 )
 
 
+# --- Obligations: what the company is *accountable* for (the CEO's liability surface) --- #
+# The apex is high-severity; controls inherit that blast radius. These exist whether or not
+# a manager asked — they are the risks that arrive at the CEO invisibly until they detonate.
+
+_INJ_PRODUCT_LIABILITY = KpiTemplate(
+    key="product_liability",
+    label="제조물 책임 / product liability (불량 유출·리콜)",
+    aliases=["제조물책임", "리콜", "product liability", "recall"],
+    root=Spec(
+        key="product_liability",
+        label="제조물 책임 통제 (유출·추적·인증)",
+        kind=NodeKind.OBLIGATION,
+        severity=SEVERE,
+        requires=[
+            Spec("defect_escape_control", "불량 유출 방지 — 검사 기록 존재", NodeKind.RECORD, grounding_tags=["inspection_log"]),
+            Spec("material_cert", "원료 물성·유해물질 인증 기록", NodeKind.RECORD, grounding_tags=["material_cert"]),
+            Spec("recall_lot_link", "리콜 시 로트 역추적 연결", NodeKind.RECORD, grounding_tags=["lot_link"]),
+        ],
+    ),
+)
+
+_INJ_WORKER_SAFETY = KpiTemplate(
+    key="worker_safety",
+    label="작업자 안전 / worker safety (설비·중대재해)",
+    aliases=["안전", "중대재해", "safety", "loto"],
+    root=Spec(
+        key="worker_safety",
+        label="작업자 안전 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=CATASTROPHIC,
+        requires=[
+            Spec("loto_record", "설비 정비 시 LOTO(잠금·표찰) 기록", NodeKind.RECORD, grounding_tags=["loto_log"]),
+            Spec("guard_check", "방호장치 점검 판정 — 사람 루프", NodeKind.JUDGMENT, grounding_tags=["guard_check"]),
+        ],
+    ),
+)
+
 INJECTION_MOLDING = VerticalTemplate(
     name="injection_molding",
     kpis={t.key: t for t in (_DEFECT_RATE, _DOWNTIME, _ON_TIME)},
+    obligations={t.key: t for t in (_INJ_PRODUCT_LIABILITY, _INJ_WORKER_SAFETY)},
 )
 
 
@@ -289,9 +338,28 @@ _TRACEABILITY = KpiTemplate(
 )
 
 
+_FOOD_CONSUMER_SAFETY = KpiTemplate(
+    key="consumer_safety",
+    label="소비자 안전 / consumer safety (이물·알레르겐·공급사·리콜)",
+    aliases=["소비자안전", "이물", "알레르겐", "consumer safety", "recall"],
+    root=Spec(
+        key="consumer_safety",
+        label="소비자 안전 통제 — 파장: 리콜·브랜드·규제",
+        kind=NodeKind.OBLIGATION,
+        severity=CATASTROPHIC,
+        requires=[
+            Spec("foreign_body_control", "금속검출기/이물 검사 기록", NodeKind.RECORD, grounding_tags=["metal_detector_log"]),
+            Spec("allergen_labeling", "알레르겐 표시 검증 기록", NodeKind.RECORD, grounding_tags=["allergen_label"]),
+            Spec("supplier_material_cert", "공급사 소재 안전 인증(예: 판촉물 유해물질)", NodeKind.RECORD, grounding_tags=["supplier_cert"]),
+            Spec("recall_traceability", "리콜 시 배합 로트 역추적 — 흔히 머릿속(은닉)", NodeKind.RECORD, grounding_tags=["batch_link"]),
+        ],
+    ),
+)
+
 FOOD_MANUFACTURING = VerticalTemplate(
     name="food_manufacturing",
     kpis={t.key: t for t in (_SANITATION, _TRACEABILITY)},
+    obligations={t.key: t for t in (_FOOD_CONSUMER_SAFETY,)},
 )
 
 

@@ -23,11 +23,12 @@ from .collectors import (
     plan_sensing,
     predictive_maintenance_collector,
 )
-from .decompose import build_graph
+from .decompose import build_graph, build_obligation_graph
 from .evolve import classify_requirement, classify_signal
 from .grounding import Evidence, Signal, ground, metrics
 from .interview import Answer, generate_questions, run_round
 from .report import html_report, text_report
+from .risk import escalate, risk_register
 from .templates import VERTICALS
 
 
@@ -256,6 +257,34 @@ def cmd_collect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_risk_register(args: argparse.Namespace) -> int:
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    if not vertical.obligations:
+        print(f"'{args.vertical}' 업종에 등록된 의무(책임 표면)가 없음", file=sys.stderr)
+        return 2
+    evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+    graph = ground(build_obligation_graph(vertical), evidence, as_of=args.as_of)
+    register = risk_register(graph)
+    ceo, ops = escalate(register, args.top)
+
+    def line(it):
+        sens = "사람만" if it.human_only else "센싱가능"
+        return f"  [risk {it.risk:.2f}] (파장 {it.severity:.2f} × {it.grade.value}) {_clean_line(it.label)}  — {sens}"
+
+    print(f"대표 리스크 레지스터 — {vertical.name} 책임 표면 (파장 × 미착지 순)\n")
+    print(f"● 대표 escalation (상위 {len(ceo)} — 오늘 밤 못 자는 순서):")
+    for it in ceo:
+        print(line(it))
+    if ops:
+        print(f"\n● 운영층 worklist (나머지 {len(ops)}):")
+        for it in ops:
+            print(line(it))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -316,6 +345,13 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--as-of", type=float, default=None)
     collect.add_argument("--llm", action="store_true")
     collect.set_defaults(func=cmd_collect)
+
+    risk = sub.add_parser("risk-register", help="CEO blind-spot register: obligations ranked by blast-radius x ungroundedness")
+    risk.add_argument("--vertical", default="food_manufacturing")
+    risk.add_argument("--evidence-file")
+    risk.add_argument("--as-of", type=float, default=None)
+    risk.add_argument("--top", type=int, default=3, help="how many high-risk controls escalate to the CEO")
+    risk.set_defaults(func=cmd_risk_register)
     return parser
 
 

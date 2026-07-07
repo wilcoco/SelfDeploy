@@ -22,13 +22,14 @@ from .collectors import (
     plan_sensing,
     predictive_maintenance_collector,
 )
-from .decompose import build_graph
+from .decompose import build_graph, build_obligation_graph
 from .evolve import CONTINUOUS, PROMOTE, REDESIGN, Verdict, classify_requirement, classify_signal
 from .grounding import Evidence, Metrics, Signal, ground, metrics
 from .interview import Answer, Question, apply_answers, generate_questions, run_round
-from .ir import Contract, ContractGraph, Grade, NodeKind, Provenance
+from .ir import CATASTROPHIC, MINOR, MODERATE, SEVERE, Contract, ContractGraph, Grade, NodeKind, Provenance
 from .llm import ClaudeRequirementMapper
 from .report import html_report, text_report
+from .risk import RiskItem, effective_severity, escalate, risk_register
 from .templates import VERTICALS, VerticalTemplate
 
 __all__ = [
@@ -67,6 +68,15 @@ __all__ = [
     "predictive_maintenance_collector",
     "data_source_collector",
     "manual_gate_collector",
+    "build_obligation_graph",
+    "risk_register",
+    "effective_severity",
+    "escalate",
+    "RiskItem",
+    "CATASTROPHIC",
+    "SEVERE",
+    "MODERATE",
+    "MINOR",
 ]
 
 __version__ = "0.0.1"

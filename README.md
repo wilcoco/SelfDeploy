@@ -4,6 +4,10 @@
 
 Palantir식 FDE는 SMB에게 비용 부담이 크다. SelfDeploy는 그 역할의 *정직한 핵심*만 도구화한다 — 대시보드를 만들어주는 게 아니라, **경영자의 요구를 실제로 측정 가능하게 만들 때 드러나는 은닉층(빨간 칸)을 표면화**한다.
 
+## 상위 프레임: 책임-가시성 격차 (대표 리스크)
+
+대표이사는 **무한 책임**을 지지만 회사 말단의 통제 안 된 지점을 **알 수가 없다.** 위험은 대표가 모르는 채로 축적되다 터질 때만 도달한다(스타벅스식 판촉/품질 사고 → 브랜드 위기 → 대표 사퇴). SelfDeploy는 이 격차를 메운다: **회사가 표방한 의무에서 필연으로 도출되는 통제**를 현실 데이터에 대조하고, **미착지 통제를 파장(blast-radius)으로 순위매겨 대표의 블라인드스팟 레지스터**로 올린다. `위험 = 파장 × 미착지도`. 대표의 희소 주의력은 상위 소수에만 가고 나머지는 운영층 몫(주의력 예산). — *unknown-unknown을 ranked known-unknown으로 바꾼다.*
+
 ## 핵심 명제
 
 1. **당위 우선 (ought-first).** FDE는 *풍부한 데이터 위에* 온톨로지를 얹는다(descriptive). SMB엔 그 데이터가 없다. 우리는 반대로 — **경영자의 요구사항 자체를 당위로 삼아**, 그것이 *논리적으로 필연으로 요구하는* 하부구조를 세운다. "불량률을 원한다 ⟹ 불량 정의·검사 이벤트·처리 기록이 없으면 그 숫자는 거짓이다."
@@ -83,7 +87,13 @@ python -m selfdeploy collect \
 ```
 `predictive-maintenance`(비침습 CT전류/토크/압력 + drift/dropout 검출)를 어댑터로 흡수 — 기계 관측 태그(`machine_state`, `downtime_log`)를 데이터 신호(as_of 포함)로. 단, 검사·처리 기록 같은 **인간 판단 은닉층은 기계로 못 닫는다**는 걸 정직하게 드러냄.
 
-**5) 이중 속도 — 변화가 상시입력인지 재설계인지 타입으로 판정:**
+**5) 대표 리스크 레지스터 — 의무를 파장×미착지로 순위매겨 escalation:**
+```bash
+python -m selfdeploy risk-register --vertical food_manufacturing --top 3
+```
+경영자가 *요구 안 해도* 회사가 책임지는 의무(소비자안전/HACCP/이물/공급사인증/리콜 추적)를 전부 인스턴스화 → 미착지 통제를 `위험 = 파장 × 미착지도`로 정렬 → 상위 N은 대표 escalation("오늘 밤 못 자는 순서"), 나머지는 운영층 worklist. 심각도(CATASTROPHIC/SEVERE/…)는 의무 루트에 박히고 통제가 상속(안전 통제가 품질 통제를 앞선다). 센싱으로 못 닫는 칸은 "사람만"으로 표시.
+
+**6) 이중 속도 — 변화가 상시입력인지 재설계인지 타입으로 판정:**
 ```bash
 # 트랩 케이스: 검사 데이터처럼 보이지만 새 처리경로를 실은 신호 → 승급 판정
 echo '{"id":"QC.new","kind":"data","tags":["inspection_log","repaint_route"]}' \
@@ -106,12 +116,14 @@ python -m pytest -q
 - `interview.py` — 강제 질문 → 답변 → 재착지 (Kind-A 추출)
 - `evolve.py` — 이중 속도 판정 (상시입력/승급/재설계)
 - `collectors.py` — 말단 센싱 수집기 + 카탈로그 + 갭→센싱 플래너 (predictive-maintenance 어댑터)
+- `risk.py` — 대표 리스크 레지스터 (파장×미착지, 심각도 상속, 주의력 예산)
 - `llm.py` — 선택적 Claude 요구→KPI 매퍼 (격리된 비결정성 단계)
 - `report.py` — 텍스트/HTML 간극 지도
-- `cli.py` — analyze / questions / interview / classify / plan-sensing / collect
+- `cli.py` — analyze / questions / interview / classify / plan-sensing / collect / risk-register
+- `docs/SENSING.md` — 말단 센싱 카탈로그(parked)
 
 ## 상태
 
-v0 스캐폴드, 44 테스트 통과. 있는 것: IR, 사출+식품 시드 템플릿, 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 시간적 부식, 선택적 LLM 매핑, 말단 센싱 수집기 + 갭→센싱 플래너(predictive-maintenance 어댑터).
+v0 스캐폴드, 51 테스트 통과. 있는 것: IR(심각도 포함), 사출+식품 시드 템플릿(KPI+의무 레이어), 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 시간적 부식, 선택적 LLM 매핑, 말단 센싱 수집기 + 갭→센싱 플래너, 대표 리스크 레지스터(파장×미착지 + 주의력 예산).
 
 다음: 수집기 확충(진동/음향/온도 IoT, 비전 검사, OPC-UA/Modbus 탭), HTML 간극 지도에 센싱 계획 렌더링, 라이브 predictive-maintenance 서버 연동(REST poll), 셋째 업종.
