@@ -17,12 +17,22 @@ import json
 import sys
 from pathlib import Path
 
+from .collectors import (
+    collect_all,
+    data_source_collector,
+    plan_sensing,
+    predictive_maintenance_collector,
+)
 from .decompose import build_graph
 from .evolve import classify_requirement, classify_signal
-from .grounding import Evidence, Signal, ground
+from .grounding import Evidence, Signal, ground, metrics
 from .interview import Answer, generate_questions, run_round
 from .report import html_report, text_report
 from .templates import VERTICALS
+
+
+def _clean_line(text: str) -> str:
+    return " ".join(text.split())
 
 
 def _mapper(args: argparse.Namespace):
@@ -181,6 +191,71 @@ def cmd_classify(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plan_sensing(args: argparse.Namespace) -> int:
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    requirement = _read_requirement(args)
+    if requirement is None:
+        print("provide --requirement or --requirement-file", file=sys.stderr)
+        return 2
+    evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+    graph = ground(build_graph(requirement, vertical, _mapper(args)), evidence, as_of=args.as_of)
+
+    plans = plan_sensing(graph)
+    sensor = [p for p in plans if not p.human_only]
+    human = [p for p in plans if p.human_only]
+
+    print("빨간/미검증 칸 → 말단 센싱 대안\n")
+    if sensor:
+        print("● 센싱으로 닫을 수 있는 칸:")
+        for p in sensor:
+            strength = "검증(강)" if p.best_strength == "strong" else "미검증(약)"
+            print(f"  ✗ {_clean_line(p.label)}")
+            print(f"      후보: {', '.join(p.candidates)}  → {strength}")
+    if human:
+        print("\n● 센싱 대안 없음 — 인터뷰 게이트(사람)만:")
+        for p in human:
+            print(f"  ✗ {_clean_line(p.label)}  (은닉 판단/머릿속 — 강제 질문으로)")
+    return 0
+
+
+def cmd_collect(args: argparse.Namespace) -> int:
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    requirement = _read_requirement(args)
+    if requirement is None:
+        print("provide --requirement or --requirement-file", file=sys.stderr)
+        return 2
+    base = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+
+    collectors = []
+    if args.pm_readings:
+        readings = json.loads(Path(args.pm_readings).read_text(encoding="utf-8")).get("readings", [])
+        collectors.append(predictive_maintenance_collector(readings))
+    if args.erp:
+        collectors.append(
+            data_source_collector("ERP-tap", ["production_count", "order_due", "shipment_log", "incoming_lot", "finished_lot"])
+        )
+    if not collectors:
+        print("provide --pm-readings and/or --erp", file=sys.stderr)
+        return 2
+
+    before = metrics(ground(build_graph(requirement, vertical, _mapper(args)), base, as_of=args.as_of))
+    merged = collect_all(collectors, base)
+    graph = ground(build_graph(requirement, vertical, _mapper(args)), merged, as_of=args.as_of)
+    after = metrics(graph)
+
+    print(f"수집기 {len(collectors)}개 가동 → 신호 {len(merged.signals) - len(base.signals)}개 추가")
+    print(f"  before: red {before.red} (밀도 {before.red_density:.0%})")
+    print(f"  after : red {after.red} (밀도 {after.red_density:.0%})   → 닫은 빨간 칸: {before.red - after.red}\n")
+    print(text_report(graph))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -221,6 +296,26 @@ def build_parser() -> argparse.ArgumentParser:
     classify.add_argument("--new-requirement", help="a new manager requirement to classify")
     classify.add_argument("--llm", action="store_true")
     classify.set_defaults(func=cmd_classify)
+
+    plan = sub.add_parser("plan-sensing", help="map red cells to edge sensing alternatives")
+    plan.add_argument("--vertical", default="injection_molding")
+    plan.add_argument("--requirement")
+    plan.add_argument("--requirement-file")
+    plan.add_argument("--evidence-file")
+    plan.add_argument("--as-of", type=float, default=None)
+    plan.add_argument("--llm", action="store_true")
+    plan.set_defaults(func=cmd_plan_sensing)
+
+    collect = sub.add_parser("collect", help="run edge collectors, merge signals, re-ground")
+    collect.add_argument("--vertical", default="injection_molding")
+    collect.add_argument("--requirement")
+    collect.add_argument("--requirement-file")
+    collect.add_argument("--evidence-file")
+    collect.add_argument("--pm-readings", help="predictive-maintenance readings JSON {readings:[{device,ts,state}]}")
+    collect.add_argument("--erp", action="store_true", help="tap ERP for lot/count/shipment tags")
+    collect.add_argument("--as-of", type=float, default=None)
+    collect.add_argument("--llm", action="store_true")
+    collect.set_defaults(func=cmd_collect)
     return parser
 
 

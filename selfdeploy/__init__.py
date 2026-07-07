@@ -12,6 +12,16 @@ Public surface:
     text_report, html_report
     VERTICALS     the Kind-B measurement grammars
 """
+from .collectors import (
+    DEFAULT_CATALOG,
+    Collector,
+    GapPlan,
+    collect_all,
+    data_source_collector,
+    manual_gate_collector,
+    plan_sensing,
+    predictive_maintenance_collector,
+)
 from .decompose import build_graph
 from .evolve import CONTINUOUS, PROMOTE, REDESIGN, Verdict, classify_requirement, classify_signal
 from .grounding import Evidence, Metrics, Signal, ground, metrics
@@ -49,6 +59,14 @@ __all__ = [
     "CONTINUOUS",
     "PROMOTE",
     "REDESIGN",
+    "Collector",
+    "GapPlan",
+    "DEFAULT_CATALOG",
+    "collect_all",
+    "plan_sensing",
+    "predictive_maintenance_collector",
+    "data_source_collector",
+    "manual_gate_collector",
 ]
 
 __version__ = "0.0.1"

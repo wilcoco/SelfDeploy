@@ -66,7 +66,24 @@ python -m selfdeploy interview \
 ```
 담당자가 빨간 칸을 채우면 red 밀도가 떨어지고, KPI가 `RED`→`UNVERIFIED`로(약속했으나 데이터 미확인, 정직하게) 이동한다.
 
-**4) 이중 속도 — 변화가 상시입력인지 재설계인지 타입으로 판정:**
+**4) 말단 센싱 대안 — 빨간 칸을 어떤 계측으로 닫을 수 있나:**
+```bash
+python -m selfdeploy plan-sensing \
+  --requirement-file examples/requirement.txt \
+  --evidence-file examples/injection_molding_evidence.json
+```
+빨간 칸을 **센싱으로 닫히는 칸**(후보 수집기 + 강/약 등급)과 **센싱 대안 없는 칸**(은닉 판단/머릿속 → 인터뷰 게이트)으로 갈라준다. 간극 지도가 곧 *계측 조달 계획*이 됨.
+
+증거 자동 수집(수집기 가동 → 신호 병합 → 재착지):
+```bash
+python -m selfdeploy collect \
+  --requirement-file examples/requirement.txt \
+  --evidence-file examples/injection_molding_evidence.json \
+  --pm-readings examples/pm_readings.json   # predictive-maintenance /ingest 스타일 feed
+```
+`predictive-maintenance`(비침습 CT전류/토크/압력 + drift/dropout 검출)를 어댑터로 흡수 — 기계 관측 태그(`machine_state`, `downtime_log`)를 데이터 신호(as_of 포함)로. 단, 검사·처리 기록 같은 **인간 판단 은닉층은 기계로 못 닫는다**는 걸 정직하게 드러냄.
+
+**5) 이중 속도 — 변화가 상시입력인지 재설계인지 타입으로 판정:**
 ```bash
 # 트랩 케이스: 검사 데이터처럼 보이지만 새 처리경로를 실은 신호 → 승급 판정
 echo '{"id":"QC.new","kind":"data","tags":["inspection_log","repaint_route"]}' \
@@ -88,12 +105,13 @@ python -m pytest -q
 - `grounding.py` — 결정론 착지 게이트 + red 밀도
 - `interview.py` — 강제 질문 → 답변 → 재착지 (Kind-A 추출)
 - `evolve.py` — 이중 속도 판정 (상시입력/승급/재설계)
+- `collectors.py` — 말단 센싱 수집기 + 카탈로그 + 갭→센싱 플래너 (predictive-maintenance 어댑터)
 - `llm.py` — 선택적 Claude 요구→KPI 매퍼 (격리된 비결정성 단계)
 - `report.py` — 텍스트/HTML 간극 지도
-- `cli.py` — analyze / questions / interview / classify
+- `cli.py` — analyze / questions / interview / classify / plan-sensing / collect
 
 ## 상태
 
-v0 스캐폴드, 28 테스트 통과. 있는 것: IR, 사출 시드 템플릿, 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 선택적 LLM 매핑.
+v0 스캐폴드, 44 테스트 통과. 있는 것: IR, 사출+식품 시드 템플릿, 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 시간적 부식, 선택적 LLM 매핑, 말단 센싱 수집기 + 갭→센싱 플래너(predictive-maintenance 어댑터).
 
-다음: 증거 자동 수집(계측/ERP·MES 탭 = 콜드스타트 (i) 통합 플레이), 신뢰 등급의 *시간적* 획득/상실(오래된 VERIFIED가 재확인 없으면 UNVERIFIED로 부식), 둘째 업종 문법(Kind-B 분할상각 실증).
+다음: 수집기 확충(진동/음향/온도 IoT, 비전 검사, OPC-UA/Modbus 탭), HTML 간극 지도에 센싱 계획 렌더링, 라이브 predictive-maintenance 서버 연동(REST poll), 셋째 업종.
