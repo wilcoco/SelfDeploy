@@ -274,6 +274,27 @@ _FINANCIAL_CONTROL = KpiTemplate(
 )
 
 
+_BRAND_SENSITIVITY = KpiTemplate(
+    key="brand_sensitivity",
+    label="브랜드·홍보 정서 리스크 / marketing sensitivity (탱크데이형)",
+    aliases=["홍보", "마케팅정서", "캠페인", "brand sensitivity"],
+    root=Spec(
+        key="brand_sensitivity",
+        label="대외 홍보·마케팅 정서 통제 — 합법이어도 대표를 무너뜨리는 축",
+        kind=NodeKind.OBLIGATION,
+        severity=CATASTROPHIC,          # 탱크데이: 대표 해임 + 대국민 사과 + 불매 + 매출·앱 급감
+        exposure=["역사·사회", "브랜드·여론", "정치"],
+        regulations=[],                 # 법은 여론 폭발 *후에* 따라옴 — 법규 뷰로는 사전에 절대 못 잡음
+        requires=[
+            Spec("campaign_sensitivity_review", "대외 캠페인 사전 정서·역사·정치 민감성 검토 게이트(검토자·일자 기록)", NodeKind.RECORD, grounding_tags=["sensitivity_review_log"], owner_role="법무"),
+            Spec("sensitive_context_check", "출시 문구·명칭·일자의 민감 맥락 충돌 자동 점검", NodeKind.RECORD, grounding_tags=["context_check_log"], owner_role="마케팅"),
+            Spec("external_sentiment_monitor", "출시 후 여론 모니터링(소셜 리스닝)", NodeKind.RECORD, grounding_tags=["sentiment_monitor"], owner_role="홍보"),
+            Spec("crisis_response_playbook", "논란 발생 시 즉시 중단·사과 프로토콜", NodeKind.JUDGMENT, grounding_tags=["crisis_playbook"], owner_role="홍보"),
+        ],
+    ),
+)
+
+
 # --- Obligations: what the company is *accountable* for (the CEO's liability surface) --- #
 # The apex is high-severity; controls inherit that blast radius. These exist whether or not
 # a manager asked — they are the risks that arrive at the CEO invisibly until they detonate.
@@ -432,7 +453,7 @@ _FOOD_CONSUMER_SAFETY = KpiTemplate(
 FOOD_MANUFACTURING = VerticalTemplate(
     name="food_manufacturing",
     kpis={t.key: t for t in (_SANITATION, _TRACEABILITY)},
-    obligations={t.key: t for t in (_FOOD_CONSUMER_SAFETY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL)},
+    obligations={t.key: t for t in (_FOOD_CONSUMER_SAFETY, _BRAND_SENSITIVITY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL)},
 )
 
 
@@ -513,7 +534,7 @@ _FS_LABOR_SAFETY = KpiTemplate(
 FOODSERVICE_FRANCHISE = VerticalTemplate(
     name="foodservice_franchise",
     kpis={t.key: t for t in (_FS_STORE_HYGIENE,)},
-    obligations={t.key: t for t in (_FS_CONSUMER_SAFETY, _FS_PROMO_LOAD, _FS_LABOR_SAFETY, _PRIVACY, _FINANCIAL_CONTROL)},
+    obligations={t.key: t for t in (_FS_CONSUMER_SAFETY, _BRAND_SENSITIVITY, _FS_PROMO_LOAD, _FS_LABOR_SAFETY, _PRIVACY, _FINANCIAL_CONTROL)},
 )
 
 

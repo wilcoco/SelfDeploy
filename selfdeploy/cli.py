@@ -38,6 +38,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
+from .sensitivity import LLMSensitivityChecker, check_campaign
 from .risk import by_exposure, by_regulation, escalate, risk_register
 from .templates import VERTICALS
 
@@ -354,6 +355,26 @@ def cmd_risk_register(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sensitivity_check(args: argparse.Namespace) -> int:
+    text = args.text
+    if args.text_file:
+        text = Path(args.text_file).read_text(encoding="utf-8")
+    if not text:
+        print("provide --text or --text-file", file=sys.stderr)
+        return 2
+    checker = LLMSensitivityChecker() if args.llm else None
+    flags = check_campaign(text, date=args.date, llm=checker)
+
+    print(f"캠페인 사전 민감성 점검 — 출시일 {args.date or '(미정)'}")
+    if not flags:
+        print("  ✓ 알려진 민감 일자·문구 충돌 없음 (단, 완전성 보장 아님 — --llm 로 심화)")
+        return 0
+    print(f"  ✗ {len(flags)}건 충돌 — 출시 보류 권고:")
+    for f in flags:
+        print(f"    · [{f.kind}] '{f.matched}' — {f.reason}")
+    return 1  # non-zero: this campaign should not ship as-is
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -431,6 +452,13 @@ def build_parser() -> argparse.ArgumentParser:
     risk.add_argument("--by-exposure", action="store_true", help="roll up by consequence class (법규/브랜드·여론/노무·ESG/정치/…)")
     risk.add_argument("--html", help="write a board-ready one-page risk register to this path")
     risk.set_defaults(func=cmd_risk_register)
+
+    sens = sub.add_parser("sensitivity-check", help="pre-release check: does a campaign collide with sensitive dates/phrases (탱크데이형)")
+    sens.add_argument("--text", help="campaign copy / name")
+    sens.add_argument("--text-file")
+    sens.add_argument("--date", help="launch date (YYYY-MM-DD or MM-DD)")
+    sens.add_argument("--llm", action="store_true", help="add an LLM pass for novel collisions")
+    sens.set_defaults(func=cmd_sensitivity_check)
     return parser
 
 

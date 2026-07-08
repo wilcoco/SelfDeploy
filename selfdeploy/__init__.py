@@ -39,6 +39,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
+from .sensitivity import Flag, LLMSensitivityChecker, check_campaign
 from .risk import (
     RiskItem,
     by_exposure,
@@ -109,6 +110,9 @@ __all__ = [
     "by_exposure",
     "effective_exposure",
     "LLMOrgInferer",
+    "check_campaign",
+    "Flag",
+    "LLMSensitivityChecker",
 ]
 
 __version__ = "0.0.1"
