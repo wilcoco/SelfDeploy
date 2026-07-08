@@ -40,6 +40,7 @@ from .owners import (
 from .report import html_report, risk_register_html, text_report
 from .categories import RISK_CATEGORIES, coverage
 from .clearance import ACTION_TYPES, clear_action
+from .manage import cascade, management_surface, select, status_summary
 from .sensitivity import LLMSensitivityChecker, check_campaign
 from .risk import by_exposure, by_regulation, escalate, risk_register
 from .templates import VERTICALS
@@ -420,6 +421,45 @@ def cmd_categories(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_manage(args: argparse.Namespace) -> int:
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+    requirement = _read_requirement(args) or ""
+    resolver = None
+    if args.org_chart:
+        resolver = org_chart_resolver(json.loads(Path(args.org_chart).read_text(encoding="utf-8")))
+
+    surface = management_surface(vertical, evidence, requirement=requirement, mapper=_mapper(args), resolver=resolver)
+
+    print(f"경영 관리 루프 — {vertical.name}\n")
+    print("① 제안 — 관리 대상(성과 + 리스크 카테고리, 가중치순):")
+    for it in surface:
+        who = f" [{it.owner}]" if it.owner else ""
+        print(f"  ({it.weight:.2f}) [{it.category}] {_clean_line(it.label)} — {it.status}{who}")
+
+    codes = set(c.strip() for c in args.select.split(",")) if args.select else None
+    if not codes and args.top is None:
+        print("\n(선택 없음 — 대표가 --select <카테고리코드> 또는 --top N 으로 관리 대상을 고른다)")
+        return 0
+
+    picked = select(surface, codes=codes, top=args.top)
+    print(f"\n② 선택 — {len(picked)}건 " + (f"(카테고리 {', '.join(sorted(codes))})" if codes else f"(상위 {args.top})"))
+
+    print("\n③ 케스케이딩 — 오너에게 배분(비난 아닌 자원·도움):")
+    for owner, items in sorted(cascade(picked).items(), key=lambda kv: -max(i.weight for i in kv[1])):
+        print(f"  ▸ {owner} — {len(items)}건:")
+        for it in items:
+            print(f"      · {_clean_line(it.label)} — {it.status}")
+
+    print("\n④ 관리 — 상태 요약:")
+    for st, n in sorted(status_summary(picked).items()):
+        print(f"  {st}: {n}건")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -517,6 +557,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     cats = sub.add_parser("categories", help="CEO-risk category taxonomy grounded in 30 years of cases")
     cats.set_defaults(func=cmd_categories)
+
+    mng = sub.add_parser("manage", help="CEO management loop: propose -> select -> cascade -> manage")
+    mng.add_argument("--vertical", default="foodservice_franchise")
+    mng.add_argument("--evidence-file")
+    mng.add_argument("--requirement")
+    mng.add_argument("--requirement-file")
+    mng.add_argument("--select", help="category codes to steer, comma-separated (e.g. C4,C5,성과)")
+    mng.add_argument("--top", type=int, default=None, help="steer the top-N weighted items")
+    mng.add_argument("--org-chart", help="owner mapping JSON {role: person}")
+    mng.add_argument("--llm", action="store_true")
+    mng.set_defaults(func=cmd_manage)
     return parser
 
 
