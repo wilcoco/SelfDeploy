@@ -72,6 +72,19 @@ SEVERE = 0.75        # brand crisis, large liability
 MODERATE = 0.5       # financial loss, delivery incident
 MINOR = 0.25         # local inefficiency (default)
 
+# How much each consequence class amplifies an action's CEO-importance.
+# Note: this is independent of financial size — a cheap action touching a
+# high-weight class (역사·사회, 안전·생명) is still CEO-critical (the 탱크데이 lesson).
+EXPOSURE_WEIGHT: dict[str, float] = {
+    "안전·생명": 1.0,
+    "역사·사회": 1.0,
+    "정치": 0.9,
+    "브랜드·여론": 0.8,
+    "노무·ESG": 0.7,
+    "법규": 0.6,
+    "재무": 0.5,
+}
+
 
 @dataclass
 class Contract:

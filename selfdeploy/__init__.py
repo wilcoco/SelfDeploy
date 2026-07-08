@@ -39,6 +39,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
+from .clearance import ACTION_TYPES, ActionType, Clearance, clear_action
 from .sensitivity import Flag, LLMSensitivityChecker, check_campaign
 from .risk import (
     RiskItem,
@@ -113,6 +114,10 @@ __all__ = [
     "check_campaign",
     "Flag",
     "LLMSensitivityChecker",
+    "clear_action",
+    "Clearance",
+    "ActionType",
+    "ACTION_TYPES",
 ]
 
 __version__ = "0.0.1"

@@ -38,6 +38,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
+from .clearance import ACTION_TYPES, clear_action
 from .sensitivity import LLMSensitivityChecker, check_campaign
 from .risk import by_exposure, by_regulation, escalate, risk_register
 from .templates import VERTICALS
@@ -375,6 +376,35 @@ def cmd_sensitivity_check(args: argparse.Namespace) -> int:
     return 1  # non-zero: this campaign should not ship as-is
 
 
+def cmd_clear_action(args: argparse.Namespace) -> int:
+    text = args.text or ""
+    if args.text_file:
+        text = Path(args.text_file).read_text(encoding="utf-8")
+    passed = set(args.passed or [])
+    checker = LLMSensitivityChecker() if args.llm else None
+    c = clear_action(
+        args.type, text=text, date=args.date, passed=passed,
+        financial_weight=args.financial, llm=checker,
+    )
+
+    verdict = "✓ CLEARED — 진행 가능" if c.cleared else "✗ BLOCKED — 진행 불가(기본 차단)"
+    print(f"행위 클리어런스: [{args.type}] {verdict}")
+    print(f"  CEO 중요도 {c.ceo_importance:.2f}  (재무가중 {c.financial_weight:.2f} → 리스크 증폭으로 상향)")
+    if c.unknown_type:
+        print("  · 모델에 없는 행위 유형 — 화이트리스트는 미지의 것을 기본 차단한다")
+    if c.triggered_exposure:
+        print(f"  · 노출 클래스: {'/'.join(c.triggered_exposure)}")
+    if c.auto_flags:
+        print(f"  · 자동 민감성 플래그 {len(c.auto_flags)}건:")
+        for f in c.auto_flags:
+            print(f"      - [{f.kind}] '{f.matched}' — {f.reason}")
+    if c.missing_clearances:
+        print(f"  · 미획득 필수 클리어런스: {', '.join(c.missing_clearances)}")
+    if c.cleared:
+        print("  → 모든 필수 검토 통과 + 자동 플래그 없음. 통과.")
+    return 0 if c.cleared else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -459,6 +489,16 @@ def build_parser() -> argparse.ArgumentParser:
     sens.add_argument("--date", help="launch date (YYYY-MM-DD or MM-DD)")
     sens.add_argument("--llm", action="store_true", help="add an LLM pass for novel collisions")
     sens.set_defaults(func=cmd_sensitivity_check)
+
+    clr = sub.add_parser("clear-action", help="default-deny gate: an action proceeds only if it PASSES its required clearances")
+    clr.add_argument("--type", required=True, help=f"action type ({', '.join(ACTION_TYPES)})")
+    clr.add_argument("--text", help="action content (campaign copy, statement, name)")
+    clr.add_argument("--text-file")
+    clr.add_argument("--date", help="launch/effective date (YYYY-MM-DD or MM-DD)")
+    clr.add_argument("--passed", nargs="*", help="clearances already affirmatively passed")
+    clr.add_argument("--financial", type=float, default=0.0, help="financial weight 0..1 (does NOT lower the risk floor)")
+    clr.add_argument("--llm", action="store_true")
+    clr.set_defaults(func=cmd_clear_action)
     return parser
 
 
