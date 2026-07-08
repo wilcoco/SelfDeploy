@@ -31,13 +31,14 @@ from .llm import ClaudeRequirementMapper
 from .owners import (
     LLMOwnerResolver,
     assign_owners,
+    bootstrap,
     by_owner,
     manual_resolver,
     org_chart_resolver,
     template_resolver,
 )
-from .report import html_report, text_report
-from .risk import RiskItem, effective_severity, escalate, risk_register
+from .report import html_report, risk_register_html, text_report
+from .risk import RiskItem, effective_regulations, effective_severity, escalate, risk_register
 from .templates import VERTICALS, VerticalTemplate
 
 __all__ = [
@@ -91,6 +92,9 @@ __all__ = [
     "org_chart_resolver",
     "manual_resolver",
     "LLMOwnerResolver",
+    "bootstrap",
+    "effective_regulations",
+    "risk_register_html",
 ]
 
 __version__ = "0.0.1"

@@ -13,6 +13,7 @@ its own top gaps — a few narrow questions, never the whole taxonomy.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from .ir import Contract, ContractGraph
@@ -106,6 +107,52 @@ class LLMOwnerResolver:
         text = next((b.text for b in response.content if b.type == "text"), "{}")
         role = json.loads(text).get("role")
         return role if role in self.roles else self._base(node)  # gate
+
+
+@dataclass
+class OrgRole:
+    canonical: str
+    owner: str
+    aliases: list[str] = field(default_factory=list)
+
+
+@dataclass
+class BootstrapResult:
+    resolver: Resolver
+    exceptions: list[tuple[str, str, str]]  # (contract_id, label, unmatched role) needing confirmation
+
+
+def parse_org(data: dict) -> list[OrgRole]:
+    """Accept either the rich form {roles:[{role,owner,aliases}]} or flat {role: owner}."""
+    if "roles" in data:
+        return [OrgRole(r["role"], r["owner"], r.get("aliases", [])) for r in data["roles"]]
+    return [OrgRole(role, owner, []) for role, owner in data.items() if not role.startswith("_")]
+
+
+def _lookup(role_seed: str, org: list[OrgRole]) -> Optional[str]:
+    for r in org:
+        if role_seed == r.canonical or role_seed in r.aliases:
+            return r.owner
+    return None
+
+
+def bootstrap(graph: ContractGraph, data: dict) -> BootstrapResult:
+    """Door-B setup with minimal friction: auto-infer owners from the org chart, and
+    surface only the controls whose role didn't match — the human confirms just those."""
+    org = parse_org(data)
+    exceptions: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for node in graph.iter_nodes():
+        if not node.owner_role:
+            continue
+        if _lookup(node.owner_role, org) is None and node.owner_role not in seen:
+            seen.add(node.owner_role)
+            exceptions.append((node.id, node.label, node.owner_role))
+
+    def resolver(node: Contract) -> Optional[str]:
+        return _lookup(node.owner_role, org) or (node.owner_role or None)
+
+    return BootstrapResult(resolver=resolver, exceptions=exceptions)
 
 
 def assign_owners(graph: ContractGraph, resolver: Resolver) -> ContractGraph:

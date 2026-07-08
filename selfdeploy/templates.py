@@ -36,6 +36,7 @@ class Spec:
     freshness: float | None = None  # max age before a data grounding decays (None = never)
     severity: float = 0.25  # blast-radius (0..1); obligations set high, controls inherit
     owner_role: str = ""    # functional role that owns this control (정비/품질/구매/…)
+    regulations: list[str] = field(default_factory=list)  # legal basis (obligation roots set it; controls inherit)
 
 
 @dataclass
@@ -81,6 +82,7 @@ def expand(kpi: KpiTemplate, prefix: str) -> ContractGraph:
                 freshness=spec.freshness,
                 severity=spec.severity,
                 owner_role=spec.owner_role,
+                regulations=list(spec.regulations),
                 provenance=Provenance.DOMAIN_INFERRED,
             )
         )
@@ -222,6 +224,7 @@ _INJ_PRODUCT_LIABILITY = KpiTemplate(
         label="제조물 책임 통제 (유출·추적·인증)",
         kind=NodeKind.OBLIGATION,
         severity=SEVERE,
+        regulations=["제조물책임법"],
         requires=[
             Spec("defect_escape_control", "불량 유출 방지 — 검사 기록 존재", NodeKind.RECORD, grounding_tags=["inspection_log"], owner_role="품질"),
             Spec("material_cert", "원료 물성·유해물질 인증 기록", NodeKind.RECORD, grounding_tags=["material_cert"], owner_role="구매"),
@@ -239,6 +242,7 @@ _INJ_WORKER_SAFETY = KpiTemplate(
         label="작업자 안전 통제",
         kind=NodeKind.OBLIGATION,
         severity=CATASTROPHIC,
+        regulations=["중대재해처벌법", "산업안전보건법"],
         requires=[
             Spec("loto_record", "설비 정비 시 LOTO(잠금·표찰) 기록", NodeKind.RECORD, grounding_tags=["loto_log"], owner_role="정비"),
             Spec("guard_check", "방호장치 점검 판정 — 사람 루프", NodeKind.JUDGMENT, grounding_tags=["guard_check"], owner_role="안전"),
@@ -349,6 +353,7 @@ _FOOD_CONSUMER_SAFETY = KpiTemplate(
         label="소비자 안전 통제 — 파장: 리콜·브랜드·규제",
         kind=NodeKind.OBLIGATION,
         severity=CATASTROPHIC,
+        regulations=["식품위생법", "식품 등의 표시·광고에 관한 법률", "제조물책임법"],
         requires=[
             Spec("foreign_body_control", "금속검출기/이물 검사 기록", NodeKind.RECORD, grounding_tags=["metal_detector_log"], owner_role="품질"),
             Spec("allergen_labeling", "알레르겐 표시 검증 기록", NodeKind.RECORD, grounding_tags=["allergen_label"], owner_role="품질"),

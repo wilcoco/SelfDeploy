@@ -44,6 +44,24 @@ def effective_severity(graph: ContractGraph) -> dict[str, float]:
     return eff
 
 
+def effective_regulations(graph: ContractGraph) -> dict[str, list[str]]:
+    """A control inherits the legal basis of every obligation it supports (ancestor union)."""
+    eff: dict[str, list[str]] = {}
+
+    def walk(node_id: str, inherited: list[str]) -> None:
+        node = graph.get(node_id)
+        acc = list(inherited)
+        for reg in node.regulations:
+            if reg not in acc:
+                acc.append(reg)
+        eff[node_id] = acc
+        for child in node.requires:
+            walk(child, acc)
+
+    walk(graph.root_id, [])
+    return eff
+
+
 @dataclass
 class RiskItem:
     contract_id: str
@@ -53,6 +71,7 @@ class RiskItem:
     risk: float              # severity × ungroundedness
     human_only: bool         # no sensing alternative — needs the interview gate
     owner: Optional[str] = None  # resolved owner (routes the cascade)
+    regulations: list[str] = None  # legal basis violated if this control is missing
 
 
 def _human_only(node, catalog: list[Collector]) -> bool:
@@ -65,6 +84,7 @@ def risk_register(graph: ContractGraph, catalog: list[Collector] | None = None) 
     """Rank every ungrounded control (leaf) by risk = blast-radius × ungroundedness."""
     catalog = DEFAULT_CATALOG if catalog is None else catalog
     eff = effective_severity(graph)
+    regs = effective_regulations(graph)
     items: list[RiskItem] = []
     for node in graph.iter_nodes():
         grade = node.grade if node.grade is not None else Grade.RED
@@ -82,6 +102,7 @@ def risk_register(graph: ContractGraph, catalog: list[Collector] | None = None) 
                 risk=round(sev * UNGROUNDED[grade], 4),
                 human_only=_human_only(node, catalog),
                 owner=node.owner,
+                regulations=regs.get(node.id, []),
             )
         )
     items.sort(key=lambda i: (-i.risk, -i.severity, i.contract_id))

@@ -101,6 +101,14 @@ python -m selfdeploy risk-register --llm-owners --org-desc "..."                
 ```
 `--by-owner`면 레지스터가 오너별 버킷으로 라우팅돼(대표 escalation 상위는 ★). 각 역할은 taxonomy가 아니라 *자기 상위 갭 몇 개*만 봄. 세 옵션 모두 매핑 안 된 통제는 템플릿 역할로 폴백.
 
+**문 B 세팅 부트스트랩 + 규제 매핑 + 이사회 리포트:**
+```bash
+python -m selfdeploy risk-register --org org.json --html board.html   # 자동 오너 추론(예외만 확인) + 1페이지 HTML
+```
+- **부트스트랩(`--org`)**: 조직도에서 오너 자동 추론, *매칭 안 된 역할만* "확인 필요"로 올림 → 세팅 마찰 최소화.
+- **규제 매핑**: 각 통제가 지지하는 의무의 근거 법규를 상속(중대재해처벌법/제조물책임법/식품위생법…) → 대표 레지스터에 "안 하면 무슨 법 위반"이 ⚖로 뜸.
+- **`--html`**: 파장×미착지 순위 + 담당 + 센싱 + 근거법규를 담은 **이사회용 1페이지**(인쇄→PDF, `@media print` 포함).
+
 **6) 이중 속도 — 변화가 상시입력인지 재설계인지 타입으로 판정:**
 ```bash
 # 트랩 케이스: 검사 데이터처럼 보이지만 새 처리경로를 실은 신호 → 승급 판정
@@ -128,11 +136,11 @@ python -m pytest -q
 - `owners.py` — 오너 해석 3옵션(조직도/수동/LLM) + 오너별 라우팅
 - `llm.py` — 선택적 Claude 요구→KPI 매퍼 (격리된 비결정성 단계)
 - `report.py` — 텍스트/HTML 간극 지도
-- `cli.py` — analyze / questions / interview / classify / plan-sensing / collect / risk-register
+- `cli.py` — analyze / questions / interview / classify / plan-sensing / collect / risk-register (부트스트랩·규제·이사회 HTML 포함)
 - `docs/SENSING.md` — 말단 센싱 카탈로그(parked)
 
 ## 상태
 
-v0 스캐폴드, 57 테스트 통과. 있는 것: IR(심각도 포함), 사출+식품 시드 템플릿(KPI+의무 레이어), 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 시간적 부식, 선택적 LLM 매핑, 말단 센싱 수집기 + 갭→센싱 플래너, 대표 리스크 레지스터(파장×미착지 + 주의력 예산), 오너 라우팅 3옵션(조직도/수동/LLM).
+v0 스캐폴드, 63 테스트 통과. 있는 것: IR(심각도 포함), 사출+식품 시드 템플릿(KPI+의무 레이어), 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 시간적 부식, 선택적 LLM 매핑, 말단 센싱 수집기 + 갭→센싱 플래너, 대표 리스크 레지스터(파장×미착지 + 주의력 예산), 오너 라우팅 3옵션(조직도/수동/LLM).
 
 다음: 수집기 확충(진동/음향/온도 IoT, 비전 검사, OPC-UA/Modbus 탭), HTML 간극 지도에 센싱 계획 렌더링, 라이브 predictive-maintenance 서버 연동(REST poll), 셋째 업종.

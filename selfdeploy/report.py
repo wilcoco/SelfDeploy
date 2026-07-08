@@ -10,7 +10,7 @@ import html
 import re
 
 from .grounding import Metrics, metrics
-from .ir import ContractGraph, Grade
+from .ir import CATASTROPHIC, MODERATE, SEVERE, ContractGraph, Grade
 
 
 def _clean(label: str) -> str:
@@ -71,8 +71,10 @@ def text_report(graph: ContractGraph) -> str:
 
 
 def html_report(graph: ContractGraph, title: str = "SelfDeploy — 간극 지도") -> str:
-    m = metrics(graph)
+    return _gap_body(graph, title, metrics(graph))
 
+
+def _gap_body(graph, title, m):
     def walk(node_id: str) -> str:
         node = graph.get(node_id)
         g = _grade(node)
@@ -123,4 +125,97 @@ def html_report(graph: ContractGraph, title: str = "SelfDeploy — 간극 지도
     .sub, .kind, .note {{ color: #8b949e; }}
     .kids {{ border-left-color: #30363d; }}
   }}
+</style>"""
+
+
+# --------------------------------------------------------------------------- #
+# Board-ready one-pager: the CEO / board risk register
+# --------------------------------------------------------------------------- #
+
+_SEV_LABEL = [
+    (CATASTROPHIC, "치명적", "#cf222e"),
+    (SEVERE, "심각", "#bc4c00"),
+    (MODERATE, "중대", "#9a6700"),
+    (0.0, "경미", "#656d76"),
+]
+
+
+def _sev_label(sev: float) -> tuple[str, str]:
+    for threshold, label, color in _SEV_LABEL:
+        if sev >= threshold:
+            return label, color
+    return "경미", "#656d76"
+
+
+def risk_register_html(vertical_name: str, ceo: list, ops: list, top_n: int) -> str:
+    """A one-page, print-to-PDF board report of the CEO blind-spot risk register."""
+
+    def item_row(it) -> str:
+        sev_label, sev_color = _sev_label(it.severity)
+        sens = "사람만" if it.human_only else "센싱가능"
+        who = html.escape(it.owner) if it.owner else "미지정"
+        regs = ", ".join(it.regulations or []) or "—"
+        risk_pct = int(round(it.risk * 100))
+        return (
+            "<tr>"
+            f'<td class="risk"><span class="bar" style="--w:{risk_pct}%"></span>{it.risk:.2f}</td>'
+            f'<td><span class="sev" style="background:{sev_color}">{sev_label}</span></td>'
+            f'<td class="grade">{html.escape(it.grade.value)}</td>'
+            f'<td class="label">{html.escape(_clean(it.label))}</td>'
+            f'<td class="owner">{who}</td>'
+            f'<td class="sens">{sens}</td>'
+            f'<td class="reg">{html.escape(regs)}</td>'
+            "</tr>"
+        )
+
+    def section(rows: list, cls: str) -> str:
+        body = "".join(item_row(it) for it in rows) or '<tr><td colspan="7">—</td></tr>'
+        return (
+            f'<table class="reg-table {cls}"><thead><tr>'
+            "<th>위험</th><th>파장</th><th>등급</th><th>통제</th><th>담당</th><th>센싱</th><th>근거 법규</th>"
+            f"</tr></thead><tbody>{body}</tbody></table>"
+        )
+
+    total = len(ceo) + len(ops)
+    return f"""<div class="board">
+<div class="head">
+  <h1>대표 리스크 레지스터</h1>
+  <div class="meta">{html.escape(vertical_name)} 책임 표면 · 통제 {total}건 · 위험 = 파장 × 미착지도</div>
+</div>
+<h2 class="ceo-h">대표 escalation — 오늘 밤 못 자는 순서 (상위 {len(ceo)})</h2>
+{section(ceo, "ceo")}
+<h2 class="ops-h">운영층 worklist (나머지 {len(ops)})</h2>
+{section(ops, "ops")}
+<p class="foot">이 레지스터는 회사가 <b>표방한 의무에서 필연으로 도출되는 미착지 통제</b>를 파장으로 순위매긴 것이다.
+새로운 실패(블랙스완) 예측이 아니라, unknown-unknown을 ranked known-unknown으로 바꾼다. 근거 법규는 통제가 비었을 때 노출되는 책임을 가리킨다.</p>
+</div>
+<style>
+  :root {{ color-scheme: light dark; }}
+  @page {{ size: A4; margin: 14mm; }}
+  .board {{ font-family: ui-sans-serif, system-ui, "Apple SD Gothic Neo", sans-serif; max-width: 940px; margin: 1.5rem auto; padding: 0 1rem; color: #1f2328; }}
+  .head {{ border-bottom: 3px solid #1f2328; padding-bottom: .5rem; margin-bottom: 1rem; }}
+  h1 {{ font-size: 1.5rem; margin: 0; }}
+  .meta {{ color: #656d76; font-size: .85rem; margin-top: .25rem; }}
+  h2 {{ font-size: 1rem; margin: 1.2rem 0 .4rem; padding-left: .5rem; border-left: 4px solid; }}
+  .ceo-h {{ border-color: #cf222e; }}
+  .ops-h {{ border-color: #656d76; color: #656d76; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: .82rem; }}
+  th {{ text-align: left; color: #656d76; font-weight: 600; border-bottom: 1px solid #d0d7de; padding: .3rem .4rem; }}
+  td {{ padding: .35rem .4rem; border-bottom: 1px solid #eaeef2; vertical-align: top; }}
+  .risk {{ position: relative; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }}
+  .bar {{ display: block; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w); background: #cf222e; }}
+  .sev {{ color: #fff; padding: .05rem .4rem; border-radius: 999px; font-size: .72rem; font-weight: 700; }}
+  .grade {{ text-transform: uppercase; font-size: .72rem; letter-spacing: .03em; color: #656d76; }}
+  .label {{ font-weight: 500; }}
+  .owner {{ white-space: nowrap; }}
+  .sens {{ color: #656d76; }}
+  .reg {{ color: #444c56; font-size: .78rem; }}
+  .ops td {{ opacity: .8; }}
+  .foot {{ margin-top: 1.2rem; color: #656d76; font-size: .78rem; line-height: 1.5; border-top: 1px solid #d0d7de; padding-top: .6rem; }}
+  @media (prefers-color-scheme: dark) {{
+    .board {{ color: #e6edf3; }} .head {{ border-color: #e6edf3; }}
+    th {{ border-color: #30363d; }} td {{ border-color: #21262d; }}
+    .foot {{ border-color: #30363d; }}
+  }}
+  @media print {{ .board {{ margin: 0; max-width: none; }} h2 {{ break-after: avoid; }} tr {{ break-inside: avoid; }} }}
 </style>"""
