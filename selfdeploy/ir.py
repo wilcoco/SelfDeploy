@@ -85,7 +85,8 @@ class Contract:
     freshness: Optional[float] = None  # max age of a data grounding before it decays to UNVERIFIED (None = never stales)
     severity: float = 0.25  # blast-radius if this goes wrong (0..1); a leaf inherits the worst of its ancestors
     owner_role: str = ""    # functional role that owns this control (정비/품질/구매/…) — routing seed
-    regulations: list[str] = field(default_factory=list)  # legal basis; a control inherits its obligations' laws
+    exposure: list[str] = field(default_factory=list)     # consequence classes: 법규/안전·생명/브랜드·여론/노무·ESG/정치/재무
+    regulations: list[str] = field(default_factory=list)  # legal detail *within* the 법규 exposure class; inherited
     # Populated by the grounding pass:
     provenance: Provenance = Provenance.DOMAIN_INFERRED
     grade: Optional[Grade] = None

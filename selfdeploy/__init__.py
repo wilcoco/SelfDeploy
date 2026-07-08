@@ -41,7 +41,9 @@ from .owners import (
 from .report import html_report, risk_register_html, text_report
 from .risk import (
     RiskItem,
+    by_exposure,
     by_regulation,
+    effective_exposure,
     effective_regulations,
     effective_severity,
     escalate,
@@ -104,6 +106,8 @@ __all__ = [
     "effective_regulations",
     "risk_register_html",
     "by_regulation",
+    "by_exposure",
+    "effective_exposure",
     "LLMOrgInferer",
 ]
 

@@ -38,7 +38,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
-from .risk import by_regulation, escalate, risk_register
+from .risk import by_exposure, by_regulation, escalate, risk_register
 from .templates import VERTICALS
 
 
@@ -309,8 +309,9 @@ def cmd_risk_register(args: argparse.Namespace) -> int:
     def line(it):
         sens = "사람만" if it.human_only else "센싱가능"
         who = f" [{it.owner}]" if it.owner else ""
+        exp = f"  ⚑ {'/'.join(it.exposure)}" if it.exposure else ""
         reg = f"  ⚖ {', '.join(it.regulations)}" if it.regulations else ""
-        return f"  [risk {it.risk:.2f}] (파장 {it.severity:.2f} × {it.grade.value}){who} {_clean_line(it.label)}  — {sens}{reg}"
+        return f"  [risk {it.risk:.2f}] (파장 {it.severity:.2f} × {it.grade.value}){who} {_clean_line(it.label)}  — {sens}{exp}{reg}"
 
     print(f"대표 리스크 레지스터 — {vertical.name} 책임 표면 (파장 × 미착지 순)\n")
     if exceptions:
@@ -319,12 +320,15 @@ def cmd_risk_register(args: argparse.Namespace) -> int:
             print(f"    · 역할 '{role}' 담당자 미확인")
         print()
 
-    if args.by_regulation:
+    if args.by_exposure or args.by_regulation:
         ceo_ids = {it.contract_id for it in ceo}
-        print("● 규제별 롤업 (법규별 미착지 노출):")
-        for reg, items in by_regulation(register):
+        groups = by_exposure(register) if args.by_exposure else by_regulation(register)
+        header = "노출 클래스별 롤업 (법규만이 아닌 전 노출)" if args.by_exposure else "규제별 롤업 (법규별 미착지 노출)"
+        mark = "⚑" if args.by_exposure else "⚖"
+        print(f"● {header}:")
+        for key, items in groups:
             top = max(i.risk for i in items)
-            print(f"\n  ⚖ {reg} — 미착지 {len(items)}건 (최고위험 {top:.2f}):")
+            print(f"\n  {mark} {key} — 미착지 {len(items)}건 (최고위험 {top:.2f}):")
             for it in items:
                 star = "★" if it.contract_id in ceo_ids else " "
                 print(f"   {star} {line(it).strip()}")
@@ -424,6 +428,7 @@ def build_parser() -> argparse.ArgumentParser:
     risk.add_argument("--org-desc", help="free-text org description for --llm-owners / --llm-org")
     risk.add_argument("--by-owner", action="store_true", help="route the register into per-owner buckets")
     risk.add_argument("--by-regulation", action="store_true", help="roll the register up by legal basis")
+    risk.add_argument("--by-exposure", action="store_true", help="roll up by consequence class (법규/브랜드·여론/노무·ESG/정치/…)")
     risk.add_argument("--html", help="write a board-ready one-page risk register to this path")
     risk.set_defaults(func=cmd_risk_register)
     return parser

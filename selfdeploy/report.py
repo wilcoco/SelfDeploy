@@ -154,6 +154,7 @@ def risk_register_html(vertical_name: str, ceo: list, ops: list, top_n: int) -> 
         sev_label, sev_color = _sev_label(it.severity)
         sens = "사람만" if it.human_only else "센싱가능"
         who = html.escape(it.owner) if it.owner else "미지정"
+        exps = "".join(f'<span class="exp">{html.escape(e)}</span>' for e in (it.exposure or [])) or "—"
         regs = ", ".join(it.regulations or []) or "—"
         risk_pct = int(round(it.risk * 100))
         return (
@@ -163,16 +164,17 @@ def risk_register_html(vertical_name: str, ceo: list, ops: list, top_n: int) -> 
             f'<td class="grade">{html.escape(it.grade.value)}</td>'
             f'<td class="label">{html.escape(_clean(it.label))}</td>'
             f'<td class="owner">{who}</td>'
+            f'<td class="exps">{exps}</td>'
             f'<td class="sens">{sens}</td>'
             f'<td class="reg">{html.escape(regs)}</td>'
             "</tr>"
         )
 
     def section(rows: list, cls: str) -> str:
-        body = "".join(item_row(it) for it in rows) or '<tr><td colspan="7">—</td></tr>'
+        body = "".join(item_row(it) for it in rows) or '<tr><td colspan="8">—</td></tr>'
         return (
             f'<table class="reg-table {cls}"><thead><tr>'
-            "<th>위험</th><th>파장</th><th>등급</th><th>통제</th><th>담당</th><th>센싱</th><th>근거 법규</th>"
+            "<th>위험</th><th>파장</th><th>등급</th><th>통제</th><th>담당</th><th>노출</th><th>센싱</th><th>근거 법규</th>"
             f"</tr></thead><tbody>{body}</tbody></table>"
         )
 
@@ -187,7 +189,8 @@ def risk_register_html(vertical_name: str, ceo: list, ops: list, top_n: int) -> 
 <h2 class="ops-h">운영층 worklist (나머지 {len(ops)})</h2>
 {section(ops, "ops")}
 <p class="foot">이 레지스터는 회사가 <b>표방한 의무에서 필연으로 도출되는 미착지 통제</b>를 파장으로 순위매긴 것이다.
-새로운 실패(블랙스완) 예측이 아니라, unknown-unknown을 ranked known-unknown으로 바꾼다. 근거 법규는 통제가 비었을 때 노출되는 책임을 가리킨다.</p>
+새로운 실패(블랙스완) 예측이 아니라, unknown-unknown을 ranked known-unknown으로 바꾼다.
+<b>노출</b>은 통제가 비었을 때의 결과 클래스다 — 법규는 그중 하나일 뿐, 브랜드·여론·정치·노무 노출은 법을 어기지 않고도 대표를 무너뜨린다(스타벅스 판촉 사례형).</p>
 </div>
 <style>
   :root {{ color-scheme: light dark; }}
@@ -209,6 +212,8 @@ def risk_register_html(vertical_name: str, ceo: list, ops: list, top_n: int) -> 
   .label {{ font-weight: 500; }}
   .owner {{ white-space: nowrap; }}
   .sens {{ color: #656d76; }}
+  .exps {{ line-height: 1.6; }}
+  .exp {{ display: inline-block; background: #eef2f6; color: #33404d; border-radius: 999px; padding: .02rem .38rem; font-size: .68rem; margin: 0 .15rem .15rem 0; white-space: nowrap; }}
   .reg {{ color: #444c56; font-size: .78rem; }}
   .ops td {{ opacity: .8; }}
   .foot {{ margin-top: 1.2rem; color: #656d76; font-size: .78rem; line-height: 1.5; border-top: 1px solid #d0d7de; padding-top: .6rem; }}

@@ -44,22 +44,36 @@ def effective_severity(graph: ContractGraph) -> dict[str, float]:
     return eff
 
 
-def effective_regulations(graph: ContractGraph) -> dict[str, list[str]]:
-    """A control inherits the legal basis of every obligation it supports (ancestor union)."""
+def _inherit_union(graph: ContractGraph, field: str) -> dict[str, list[str]]:
+    """Generic ancestor-union of a list field (regulations / exposure classes)."""
     eff: dict[str, list[str]] = {}
 
     def walk(node_id: str, inherited: list[str]) -> None:
         node = graph.get(node_id)
         acc = list(inherited)
-        for reg in node.regulations:
-            if reg not in acc:
-                acc.append(reg)
+        for v in getattr(node, field):
+            if v not in acc:
+                acc.append(v)
         eff[node_id] = acc
         for child in node.requires:
             walk(child, acc)
 
     walk(graph.root_id, [])
     return eff
+
+
+def effective_regulations(graph: ContractGraph) -> dict[str, list[str]]:
+    """A control inherits the legal basis of every obligation it supports."""
+    return _inherit_union(graph, "regulations")
+
+
+def effective_exposure(graph: ContractGraph) -> dict[str, list[str]]:
+    """A control inherits the consequence classes of every obligation it supports.
+
+    Legal is only one class — brand/public/political/labor exposures land here too,
+    so a legally-compliant-but-still-detonating risk (the Starbucks pattern) is visible.
+    """
+    return _inherit_union(graph, "exposure")
 
 
 @dataclass
@@ -71,7 +85,8 @@ class RiskItem:
     risk: float              # severity × ungroundedness
     human_only: bool         # no sensing alternative — needs the interview gate
     owner: Optional[str] = None  # resolved owner (routes the cascade)
-    regulations: list[str] = None  # legal basis violated if this control is missing
+    exposure: list[str] = None     # consequence classes (법규 is only one; brand/public/political/labor too)
+    regulations: list[str] = None  # legal detail within the 법규 exposure class
 
 
 def _human_only(node, catalog: list[Collector]) -> bool:
@@ -85,6 +100,7 @@ def risk_register(graph: ContractGraph, catalog: list[Collector] | None = None) 
     catalog = DEFAULT_CATALOG if catalog is None else catalog
     eff = effective_severity(graph)
     regs = effective_regulations(graph)
+    exps = effective_exposure(graph)
     items: list[RiskItem] = []
     for node in graph.iter_nodes():
         grade = node.grade if node.grade is not None else Grade.RED
@@ -102,6 +118,7 @@ def risk_register(graph: ContractGraph, catalog: list[Collector] | None = None) 
                 risk=round(sev * UNGROUNDED[grade], 4),
                 human_only=_human_only(node, catalog),
                 owner=node.owner,
+                exposure=exps.get(node.id, []),
                 regulations=regs.get(node.id, []),
             )
         )
@@ -114,16 +131,25 @@ def escalate(register: list[RiskItem], top_n: int) -> tuple[list[RiskItem], list
     return register[:top_n], register[top_n:]
 
 
-def by_regulation(register: list[RiskItem]) -> list[tuple[str, list[RiskItem]]]:
-    """Roll the register up by legal basis — an item appears under each law it touches.
-
-    Returns (regulation, items) sorted by the group's worst risk, so "which law am I
-    most exposed on" reads off the top. Items with no regulation are omitted.
-    """
+def _rollup(register: list[RiskItem], attr: str) -> list[tuple[str, list[RiskItem]]]:
     buckets: dict[str, list[RiskItem]] = {}
     for it in register:
-        for reg in it.regulations or []:
-            buckets.setdefault(reg, []).append(it)
-    groups = [(reg, sorted(items, key=lambda i: -i.risk)) for reg, items in buckets.items()]
+        for key in getattr(it, attr) or []:
+            buckets.setdefault(key, []).append(it)
+    groups = [(k, sorted(items, key=lambda i: -i.risk)) for k, items in buckets.items()]
     groups.sort(key=lambda g: -max(i.risk for i in g[1]))
     return groups
+
+
+def by_regulation(register: list[RiskItem]) -> list[tuple[str, list[RiskItem]]]:
+    """Roll up by legal basis — one axis of consequence."""
+    return _rollup(register, "regulations")
+
+
+def by_exposure(register: list[RiskItem]) -> list[tuple[str, list[RiskItem]]]:
+    """Roll up by consequence class — 법규 is one; brand/public/political/labor are others.
+
+    This is the answer to "legal compliance is not the only risk": a control can be
+    fully lawful yet carry a 브랜드·여론 / 정치 exposure that ends a CEO's tenure.
+    """
+    return _rollup(register, "exposure")

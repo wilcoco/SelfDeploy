@@ -36,7 +36,8 @@ class Spec:
     freshness: float | None = None  # max age before a data grounding decays (None = never)
     severity: float = 0.25  # blast-radius (0..1); obligations set high, controls inherit
     owner_role: str = ""    # functional role that owns this control (정비/품질/구매/…)
-    regulations: list[str] = field(default_factory=list)  # legal basis (obligation roots set it; controls inherit)
+    exposure: list[str] = field(default_factory=list)     # consequence classes (obligation roots set; controls inherit)
+    regulations: list[str] = field(default_factory=list)  # legal detail within 법규 exposure (obligation roots set; inherit)
 
 
 @dataclass
@@ -82,6 +83,7 @@ def expand(kpi: KpiTemplate, prefix: str) -> ContractGraph:
                 freshness=spec.freshness,
                 severity=spec.severity,
                 owner_role=spec.owner_role,
+                exposure=list(spec.exposure),
                 regulations=list(spec.regulations),
                 provenance=Provenance.DOMAIN_INFERRED,
             )
@@ -222,6 +224,7 @@ _PRIVACY = KpiTemplate(
         label="개인정보 보호 통제",
         kind=NodeKind.OBLIGATION,
         severity=SEVERE,
+        exposure=["법규", "브랜드·여론"],
         regulations=["개인정보보호법"],
         requires=[
             Spec("privacy_policy_posted", "개인정보 처리방침 게시·최신화", NodeKind.RECORD, grounding_tags=["privacy_policy"], owner_role="정보보호"),
@@ -241,6 +244,7 @@ _ENVIRONMENT = KpiTemplate(
         label="환경·유해물질 통제",
         kind=NodeKind.OBLIGATION,
         severity=SEVERE,
+        exposure=["법규", "노무·ESG", "브랜드·여론"],
         regulations=["화학물질관리법", "물환경보전법"],
         requires=[
             Spec("haz_chem_record", "유해화학물질 취급·보관 기록", NodeKind.RECORD, grounding_tags=["haz_chem_log"], owner_role="환경안전"),
@@ -259,6 +263,7 @@ _FINANCIAL_CONTROL = KpiTemplate(
         label="재무 내부통제",
         kind=NodeKind.OBLIGATION,
         severity=SEVERE,
+        exposure=["법규", "재무"],
         regulations=["주식회사 등의 외부감사에 관한 법률", "상법(내부통제)"],
         requires=[
             Spec("fund_approval", "자금 집행 승인 통제 기록", NodeKind.RECORD, grounding_tags=["approval_log"], owner_role="재무"),
@@ -282,6 +287,7 @@ _INJ_PRODUCT_LIABILITY = KpiTemplate(
         label="제조물 책임 통제 (유출·추적·인증)",
         kind=NodeKind.OBLIGATION,
         severity=SEVERE,
+        exposure=["법규", "안전·생명", "브랜드·여론"],
         regulations=["제조물책임법"],
         requires=[
             Spec("defect_escape_control", "불량 유출 방지 — 검사 기록 존재", NodeKind.RECORD, grounding_tags=["inspection_log"], owner_role="품질"),
@@ -300,6 +306,7 @@ _INJ_WORKER_SAFETY = KpiTemplate(
         label="작업자 안전 통제",
         kind=NodeKind.OBLIGATION,
         severity=CATASTROPHIC,
+        exposure=["안전·생명", "법규", "노무·ESG"],
         regulations=["중대재해처벌법", "산업안전보건법"],
         requires=[
             Spec("loto_record", "설비 정비 시 LOTO(잠금·표찰) 기록", NodeKind.RECORD, grounding_tags=["loto_log"], owner_role="정비"),
@@ -411,6 +418,7 @@ _FOOD_CONSUMER_SAFETY = KpiTemplate(
         label="소비자 안전 통제 — 파장: 리콜·브랜드·규제",
         kind=NodeKind.OBLIGATION,
         severity=CATASTROPHIC,
+        exposure=["안전·생명", "브랜드·여론", "법규"],
         regulations=["식품위생법", "식품 등의 표시·광고에 관한 법률", "제조물책임법"],
         requires=[
             Spec("foreign_body_control", "금속검출기/이물 검사 기록", NodeKind.RECORD, grounding_tags=["metal_detector_log"], owner_role="품질"),
@@ -455,6 +463,7 @@ _FS_CONSUMER_SAFETY = KpiTemplate(
         label="매장 소비자 안전 통제",
         kind=NodeKind.OBLIGATION,
         severity=CATASTROPHIC,
+        exposure=["안전·생명", "브랜드·여론", "법규"],
         regulations=["식품위생법", "식품 등의 표시·광고에 관한 법률", "농수산물의 원산지 표시 등에 관한 법률"],
         requires=[
             Spec("store_hygiene_record", "매장 위생 점검 기록", NodeKind.RECORD, grounding_tags=["store_hygiene_log"], owner_role="매장운영"),
@@ -473,6 +482,7 @@ _FS_PROMO_LOAD = KpiTemplate(
         label="판촉 이벤트가 매장을 마비시키지 않게 하는 통제",
         kind=NodeKind.OBLIGATION,
         severity=SEVERE,
+        exposure=["노무·ESG", "브랜드·여론", "정치"],  # 법을 어긴 게 아니라 대중·노무 정서가 폭발한 축
         regulations=["근로기준법"],
         requires=[
             Spec("demand_forecast", "프로모션 수요 예측 기록", NodeKind.RECORD, grounding_tags=["promo_forecast"], owner_role="마케팅"),
@@ -491,6 +501,7 @@ _FS_LABOR_SAFETY = KpiTemplate(
         label="노무·안전 통제",
         kind=NodeKind.OBLIGATION,
         severity=CATASTROPHIC,
+        exposure=["안전·생명", "노무·ESG", "법규"],
         regulations=["근로기준법", "산업안전보건법", "중대재해처벌법"],
         requires=[
             Spec("work_hours_record", "근로시간 기록", NodeKind.RECORD, grounding_tags=["work_hours"], owner_role="인사"),
