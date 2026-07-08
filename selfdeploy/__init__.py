@@ -28,6 +28,14 @@ from .grounding import Evidence, Metrics, Signal, ground, metrics
 from .interview import Answer, Question, apply_answers, generate_questions, run_round
 from .ir import CATASTROPHIC, MINOR, MODERATE, SEVERE, Contract, ContractGraph, Grade, NodeKind, Provenance
 from .llm import ClaudeRequirementMapper
+from .owners import (
+    LLMOwnerResolver,
+    assign_owners,
+    by_owner,
+    manual_resolver,
+    org_chart_resolver,
+    template_resolver,
+)
 from .report import html_report, text_report
 from .risk import RiskItem, effective_severity, escalate, risk_register
 from .templates import VERTICALS, VerticalTemplate
@@ -77,6 +85,12 @@ __all__ = [
     "SEVERE",
     "MODERATE",
     "MINOR",
+    "assign_owners",
+    "by_owner",
+    "template_resolver",
+    "org_chart_resolver",
+    "manual_resolver",
+    "LLMOwnerResolver",
 ]
 
 __version__ = "0.0.1"

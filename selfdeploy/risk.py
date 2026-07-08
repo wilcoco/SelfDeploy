@@ -15,6 +15,7 @@ nobody modeled.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from .collectors import DEFAULT_CATALOG, Collector
 from .ir import ContractGraph, Grade, NodeKind
@@ -51,6 +52,7 @@ class RiskItem:
     grade: Grade
     risk: float              # severity × ungroundedness
     human_only: bool         # no sensing alternative — needs the interview gate
+    owner: Optional[str] = None  # resolved owner (routes the cascade)
 
 
 def _human_only(node, catalog: list[Collector]) -> bool:
@@ -79,6 +81,7 @@ def risk_register(graph: ContractGraph, catalog: list[Collector] | None = None) 
                 grade=grade,
                 risk=round(sev * UNGROUNDED[grade], 4),
                 human_only=_human_only(node, catalog),
+                owner=node.owner,
             )
         )
     items.sort(key=lambda i: (-i.risk, -i.severity, i.contract_id))

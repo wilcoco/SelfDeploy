@@ -84,10 +84,11 @@ class Contract:
     grounding_tags: list[str] = field(default_factory=list)  # tags an evidence signal must share to ground this
     freshness: Optional[float] = None  # max age of a data grounding before it decays to UNVERIFIED (None = never stales)
     severity: float = 0.25  # blast-radius if this goes wrong (0..1); a leaf inherits the worst of its ancestors
+    owner_role: str = ""    # functional role that owns this control (정비/품질/구매/…) — routing seed
     # Populated by the grounding pass:
     provenance: Provenance = Provenance.DOMAIN_INFERRED
     grade: Optional[Grade] = None
-    owner: Optional[str] = None        # for judgment nodes: who owns the human call
+    owner: Optional[str] = None        # resolved concrete owner (person/team); or the judgment decision-maker
     note: str = ""                     # human-readable reason for the grade
 
     @property

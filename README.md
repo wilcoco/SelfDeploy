@@ -93,6 +93,14 @@ python -m selfdeploy risk-register --vertical food_manufacturing --top 3
 ```
 경영자가 *요구 안 해도* 회사가 책임지는 의무(소비자안전/HACCP/이물/공급사인증/리콜 추적)를 전부 인스턴스화 → 미착지 통제를 `위험 = 파장 × 미착지도`로 정렬 → 상위 N은 대표 escalation("오늘 밤 못 자는 순서"), 나머지는 운영층 worklist. 심각도(CATASTROPHIC/SEVERE/…)는 의무 루트에 박히고 통제가 상속(안전 통제가 품질 통제를 앞선다). 센싱으로 못 닫는 칸은 "사람만"으로 표시.
 
+**오너 라우팅 — 케스케이딩을 덤핑이 아니라 분배로.** 각 통제엔 기능 역할(정비/품질/구매/…)이 박혀 있고, 실제 담당자 해석은 **세 옵션**:
+```bash
+python -m selfdeploy risk-register --org-chart examples/org_chart.json --by-owner  # ① 조직도 입력
+python -m selfdeploy risk-register --assign assign.json                            # ② 의무별 수동 지정
+python -m selfdeploy risk-register --llm-owners --org-desc "..."                   # ③ LLM 추론 (게이트로 감쌈)
+```
+`--by-owner`면 레지스터가 오너별 버킷으로 라우팅돼(대표 escalation 상위는 ★). 각 역할은 taxonomy가 아니라 *자기 상위 갭 몇 개*만 봄. 세 옵션 모두 매핑 안 된 통제는 템플릿 역할로 폴백.
+
 **6) 이중 속도 — 변화가 상시입력인지 재설계인지 타입으로 판정:**
 ```bash
 # 트랩 케이스: 검사 데이터처럼 보이지만 새 처리경로를 실은 신호 → 승급 판정
@@ -117,6 +125,7 @@ python -m pytest -q
 - `evolve.py` — 이중 속도 판정 (상시입력/승급/재설계)
 - `collectors.py` — 말단 센싱 수집기 + 카탈로그 + 갭→센싱 플래너 (predictive-maintenance 어댑터)
 - `risk.py` — 대표 리스크 레지스터 (파장×미착지, 심각도 상속, 주의력 예산)
+- `owners.py` — 오너 해석 3옵션(조직도/수동/LLM) + 오너별 라우팅
 - `llm.py` — 선택적 Claude 요구→KPI 매퍼 (격리된 비결정성 단계)
 - `report.py` — 텍스트/HTML 간극 지도
 - `cli.py` — analyze / questions / interview / classify / plan-sensing / collect / risk-register
@@ -124,6 +133,6 @@ python -m pytest -q
 
 ## 상태
 
-v0 스캐폴드, 51 테스트 통과. 있는 것: IR(심각도 포함), 사출+식품 시드 템플릿(KPI+의무 레이어), 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 시간적 부식, 선택적 LLM 매핑, 말단 센싱 수집기 + 갭→센싱 플래너, 대표 리스크 레지스터(파장×미착지 + 주의력 예산).
+v0 스캐폴드, 57 테스트 통과. 있는 것: IR(심각도 포함), 사출+식품 시드 템플릿(KPI+의무 레이어), 결정론 착지 게이트, 간극 지도, Kind-A 강제 질문 루프, 이중 속도 판정, 시간적 부식, 선택적 LLM 매핑, 말단 센싱 수집기 + 갭→센싱 플래너, 대표 리스크 레지스터(파장×미착지 + 주의력 예산), 오너 라우팅 3옵션(조직도/수동/LLM).
 
 다음: 수집기 확충(진동/음향/온도 IoT, 비전 검사, OPC-UA/Modbus 탭), HTML 간극 지도에 센싱 계획 렌더링, 라이브 predictive-maintenance 서버 연동(REST poll), 셋째 업종.
