@@ -155,6 +155,83 @@ def bootstrap(graph: ContractGraph, data: dict) -> BootstrapResult:
     return BootstrapResult(resolver=resolver, exceptions=exceptions)
 
 
+class LLMOrgInferer:
+    """Infer an org chart from a free-text description, gated to the known roles.
+
+    Turns "품질은 김검사팀장, 설비는 박정비, 안전보건은 정안전" into a role→owner map
+    (with aliases) that `bootstrap` can consume. Roles the model can't resolve are
+    simply omitted → they surface as bootstrap exceptions. Offline-safe.
+    """
+
+    def __init__(self, known_roles: list[str], description: str, client=None, model: str = DEFAULT_MODEL):
+        self.known_roles = known_roles
+        self.description = description
+        self.model = model
+        self._client = client
+
+    def _client_or_default(self):
+        if self._client is None:
+            import anthropic
+
+            self._client = anthropic.Anthropic()
+        return self._client
+
+    def infer(self) -> dict:
+        import json
+
+        client = self._client_or_default()
+        response = client.messages.create(
+            model=self.model,
+            max_tokens=1024,
+            system="You map functional roles to the owner named in an org description. Use only the given roles; omit any you cannot resolve.",
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"역할 후보: {self.known_roles}\n"
+                        f"조직 설명:\n{self.description}\n\n"
+                        "각 역할에 대해 설명에서 담당자(사람/팀)를 찾고, 있으면 별칭도 함께. 못 찾으면 그 역할은 빼라."
+                    ),
+                }
+            ],
+            output_config={
+                "format": {
+                    "type": "json_schema",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "roles": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "role": {"type": "string", "enum": self.known_roles},
+                                        "owner": {"type": "string"},
+                                        "aliases": {"type": "array", "items": {"type": "string"}},
+                                    },
+                                    "required": ["role", "owner"],
+                                    "additionalProperties": False,
+                                },
+                            }
+                        },
+                        "required": ["roles"],
+                        "additionalProperties": False,
+                    },
+                }
+            },
+        )
+        text = next((b.text for b in response.content if b.type == "text"), '{"roles": []}')
+        data = json.loads(text)
+        # deterministic gate: keep only known roles, dedupe by role
+        seen: set[str] = set()
+        roles = []
+        for r in data.get("roles", []):
+            if r.get("role") in self.known_roles and r["role"] not in seen and r.get("owner"):
+                seen.add(r["role"])
+                roles.append({"role": r["role"], "owner": r["owner"], "aliases": r.get("aliases", [])})
+        return {"roles": roles}
+
+
 def assign_owners(graph: ContractGraph, resolver: Resolver) -> ContractGraph:
     """Set node.owner from the resolver, without clobbering an already-owned judgment."""
     for node in graph.iter_nodes():

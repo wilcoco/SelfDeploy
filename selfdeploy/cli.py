@@ -28,6 +28,7 @@ from .evolve import classify_requirement, classify_signal
 from .grounding import Evidence, Signal, ground, metrics
 from .interview import Answer, generate_questions, run_round
 from .owners import (
+    LLMOrgInferer,
     LLMOwnerResolver,
     assign_owners,
     bootstrap,
@@ -37,7 +38,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
-from .risk import escalate, risk_register
+from .risk import by_regulation, escalate, risk_register
 from .templates import VERTICALS
 
 
@@ -279,7 +280,12 @@ def cmd_risk_register(args: argparse.Namespace) -> int:
 
     # owner resolution — options, all fall back to the template role
     exceptions = []
-    if args.org:  # bootstrap: auto-infer + surface only the unmatched roles
+    if args.llm_org:  # infer the org chart from a free-text description, then bootstrap
+        roles = sorted({n.owner_role for n in graph.iter_nodes() if n.owner_role})
+        org_data = LLMOrgInferer(roles, args.org_desc or "").infer()
+        result = bootstrap(graph, org_data)
+        resolver, exceptions = result.resolver, result.exceptions
+    elif args.org:  # bootstrap: auto-infer + surface only the unmatched roles
         result = bootstrap(graph, json.loads(Path(args.org).read_text(encoding="utf-8")))
         resolver, exceptions = result.resolver, result.exceptions
     elif args.org_chart:
@@ -312,6 +318,17 @@ def cmd_risk_register(args: argparse.Namespace) -> int:
         for _cid, _label, role in exceptions:
             print(f"    · 역할 '{role}' 담당자 미확인")
         print()
+
+    if args.by_regulation:
+        ceo_ids = {it.contract_id for it in ceo}
+        print("● 규제별 롤업 (법규별 미착지 노출):")
+        for reg, items in by_regulation(register):
+            top = max(i.risk for i in items)
+            print(f"\n  ⚖ {reg} — 미착지 {len(items)}건 (최고위험 {top:.2f}):")
+            for it in items:
+                star = "★" if it.contract_id in ceo_ids else " "
+                print(f"   {star} {line(it).strip()}")
+        return 0
 
     if args.by_owner:
         print(f"● 오너별 라우팅 (대표 escalation 상위 {len(ceo)}는 ★):")
@@ -403,8 +420,10 @@ def build_parser() -> argparse.ArgumentParser:
     risk.add_argument("--org-chart", help="owner mapping: JSON {role: person} (조직도 입력)")
     risk.add_argument("--assign", help="owner mapping: JSON {contract_id|tag: person} (수동 지정)")
     risk.add_argument("--llm-owners", action="store_true", help="owner mapping: infer via Claude (LLM 추론)")
-    risk.add_argument("--org-desc", help="org description passed to --llm-owners")
+    risk.add_argument("--llm-org", action="store_true", help="infer the org chart from --org-desc, then bootstrap")
+    risk.add_argument("--org-desc", help="free-text org description for --llm-owners / --llm-org")
     risk.add_argument("--by-owner", action="store_true", help="route the register into per-owner buckets")
+    risk.add_argument("--by-regulation", action="store_true", help="roll the register up by legal basis")
     risk.add_argument("--html", help="write a board-ready one-page risk register to this path")
     risk.set_defaults(func=cmd_risk_register)
     return parser

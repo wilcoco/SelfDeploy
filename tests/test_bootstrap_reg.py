@@ -28,9 +28,11 @@ def test_bootstrap_auto_assigns_matched_and_flags_exceptions():
     ]}
     result = bootstrap(g, org)
     assign_owners(g, result.resolver)
-    assert g.get("obl:worker_safety:loto_record").owner == "박정비"      # matched
+    assert g.get("obl:worker_safety:loto_record").owner == "박정비"      # matched (alias)
+    assert g.get("obl:product_liability:defect_escape_control").owner == "김검사"  # matched
     unmatched_roles = {role for _id, _label, role in result.exceptions}
-    assert unmatched_roles == {"구매", "생산", "안전"}                    # only the misses surfaced
+    assert {"구매", "생산", "안전"} <= unmatched_roles                    # misses surfaced
+    assert "정비" not in unmatched_roles and "품질" not in unmatched_roles
 
 
 def test_bootstrap_alias_matches():

@@ -29,6 +29,7 @@ from .interview import Answer, Question, apply_answers, generate_questions, run_
 from .ir import CATASTROPHIC, MINOR, MODERATE, SEVERE, Contract, ContractGraph, Grade, NodeKind, Provenance
 from .llm import ClaudeRequirementMapper
 from .owners import (
+    LLMOrgInferer,
     LLMOwnerResolver,
     assign_owners,
     bootstrap,
@@ -38,7 +39,14 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
-from .risk import RiskItem, effective_regulations, effective_severity, escalate, risk_register
+from .risk import (
+    RiskItem,
+    by_regulation,
+    effective_regulations,
+    effective_severity,
+    escalate,
+    risk_register,
+)
 from .templates import VERTICALS, VerticalTemplate
 
 __all__ = [
@@ -95,6 +103,8 @@ __all__ = [
     "bootstrap",
     "effective_regulations",
     "risk_register_html",
+    "by_regulation",
+    "LLMOrgInferer",
 ]
 
 __version__ = "0.0.1"

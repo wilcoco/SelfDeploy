@@ -112,3 +112,18 @@ def risk_register(graph: ContractGraph, catalog: list[Collector] | None = None) 
 def escalate(register: list[RiskItem], top_n: int) -> tuple[list[RiskItem], list[RiskItem]]:
     """Attention budget: the top-N high-risk controls reach the CEO; the rest are ops' worklist."""
     return register[:top_n], register[top_n:]
+
+
+def by_regulation(register: list[RiskItem]) -> list[tuple[str, list[RiskItem]]]:
+    """Roll the register up by legal basis — an item appears under each law it touches.
+
+    Returns (regulation, items) sorted by the group's worst risk, so "which law am I
+    most exposed on" reads off the top. Items with no regulation are omitted.
+    """
+    buckets: dict[str, list[RiskItem]] = {}
+    for it in register:
+        for reg in it.regulations or []:
+            buckets.setdefault(reg, []).append(it)
+    groups = [(reg, sorted(items, key=lambda i: -i.risk)) for reg, items in buckets.items()]
+    groups.sort(key=lambda g: -max(i.risk for i in g[1]))
+    return groups

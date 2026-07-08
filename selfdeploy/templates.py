@@ -211,6 +211,64 @@ _ON_TIME = KpiTemplate(
 )
 
 
+# --- Cross-cutting obligations (apply to almost any company; shared across verticals) --- #
+
+_PRIVACY = KpiTemplate(
+    key="privacy",
+    label="개인정보 보호 / personal-data protection",
+    aliases=["개인정보", "privacy", "프라이버시"],
+    root=Spec(
+        key="privacy",
+        label="개인정보 보호 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=SEVERE,
+        regulations=["개인정보보호법"],
+        requires=[
+            Spec("privacy_policy_posted", "개인정보 처리방침 게시·최신화", NodeKind.RECORD, grounding_tags=["privacy_policy"], owner_role="정보보호"),
+            Spec("consent_record", "수집·이용 동의 기록", NodeKind.RECORD, grounding_tags=["consent_log"], owner_role="정보보호"),
+            Spec("access_log", "개인정보 접근권한·접근 기록", NodeKind.RECORD, grounding_tags=["access_log"], owner_role="IT"),
+            Spec("disposal_record", "보유기간 경과 파기 기록", NodeKind.RECORD, grounding_tags=["disposal_log"], owner_role="정보보호"),
+        ],
+    ),
+)
+
+_ENVIRONMENT = KpiTemplate(
+    key="environment",
+    label="환경 통제 / environmental compliance",
+    aliases=["환경", "폐수", "화학물질", "environment"],
+    root=Spec(
+        key="environment",
+        label="환경·유해물질 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=SEVERE,
+        regulations=["화학물질관리법", "물환경보전법"],
+        requires=[
+            Spec("haz_chem_record", "유해화학물질 취급·보관 기록", NodeKind.RECORD, grounding_tags=["haz_chem_log"], owner_role="환경안전"),
+            Spec("wastewater_measure", "폐수 배출 수질 측정 기록", NodeKind.RECORD, grounding_tags=["wastewater_log"], owner_role="환경안전"),
+            Spec("msds_management", "MSDS 비치·갱신 기록", NodeKind.RECORD, grounding_tags=["msds"], owner_role="환경안전"),
+        ],
+    ),
+)
+
+_FINANCIAL_CONTROL = KpiTemplate(
+    key="financial_control",
+    label="재무 내부통제 / financial internal control",
+    aliases=["재무통제", "내부통제", "financial control"],
+    root=Spec(
+        key="financial_control",
+        label="재무 내부통제",
+        kind=NodeKind.OBLIGATION,
+        severity=SEVERE,
+        regulations=["주식회사 등의 외부감사에 관한 법률", "상법(내부통제)"],
+        requires=[
+            Spec("fund_approval", "자금 집행 승인 통제 기록", NodeKind.RECORD, grounding_tags=["approval_log"], owner_role="재무"),
+            Spec("tax_invoice_recon", "세금계산서 대사 기록", NodeKind.RECORD, grounding_tags=["tax_recon"], owner_role="재무"),
+            Spec("inventory_count", "재고 실사 기록", NodeKind.RECORD, grounding_tags=["stock_count"], owner_role="재무"),
+        ],
+    ),
+)
+
+
 # --- Obligations: what the company is *accountable* for (the CEO's liability surface) --- #
 # The apex is high-severity; controls inherit that blast radius. These exist whether or not
 # a manager asked — they are the risks that arrive at the CEO invisibly until they detonate.
@@ -253,7 +311,7 @@ _INJ_WORKER_SAFETY = KpiTemplate(
 INJECTION_MOLDING = VerticalTemplate(
     name="injection_molding",
     kpis={t.key: t for t in (_DEFECT_RATE, _DOWNTIME, _ON_TIME)},
-    obligations={t.key: t for t in (_INJ_PRODUCT_LIABILITY, _INJ_WORKER_SAFETY)},
+    obligations={t.key: t for t in (_INJ_PRODUCT_LIABILITY, _INJ_WORKER_SAFETY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL)},
 )
 
 
@@ -366,11 +424,90 @@ _FOOD_CONSUMER_SAFETY = KpiTemplate(
 FOOD_MANUFACTURING = VerticalTemplate(
     name="food_manufacturing",
     kpis={t.key: t for t in (_SANITATION, _TRACEABILITY)},
-    obligations={t.key: t for t in (_FOOD_CONSUMER_SAFETY,)},
+    obligations={t.key: t for t in (_FOOD_CONSUMER_SAFETY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL)},
+)
+
+
+# --------------------------------------------------------------------------- #
+# Third vertical: foodservice / franchise (외식·프랜차이즈) — closest to the Starbucks case
+# --------------------------------------------------------------------------- #
+
+_FS_STORE_HYGIENE = KpiTemplate(
+    key="store_hygiene",
+    label="매장 위생 점검 준수율 / store hygiene",
+    aliases=["위생", "매장위생", "hygiene"],
+    root=Spec(
+        key="store_hygiene",
+        label="매장 위생 준수율 = 준수 점검 / 전체 점검",
+        kind=NodeKind.KPI,
+        requires=[
+            Spec("hygiene_check_record", "매장 위생 점검 체크리스트 기록", NodeKind.RECORD, grounding_tags=["store_hygiene_log"], owner_role="매장운영"),
+        ],
+    ),
+)
+
+_FS_CONSUMER_SAFETY = KpiTemplate(
+    key="consumer_safety",
+    label="소비자 안전 / consumer safety (위생·알레르기·원산지)",
+    aliases=["소비자안전", "알레르기", "원산지", "consumer safety"],
+    root=Spec(
+        key="consumer_safety",
+        label="매장 소비자 안전 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=CATASTROPHIC,
+        regulations=["식품위생법", "식품 등의 표시·광고에 관한 법률", "농수산물의 원산지 표시 등에 관한 법률"],
+        requires=[
+            Spec("store_hygiene_record", "매장 위생 점검 기록", NodeKind.RECORD, grounding_tags=["store_hygiene_log"], owner_role="매장운영"),
+            Spec("allergen_notice", "알레르기 유발물질 고지", NodeKind.RECORD, grounding_tags=["allergen_label"], owner_role="매장운영"),
+            Spec("origin_labeling", "원산지 표시 기록", NodeKind.RECORD, grounding_tags=["origin_label"], owner_role="구매"),
+        ],
+    ),
+)
+
+_FS_PROMO_LOAD = KpiTemplate(
+    key="promo_operational_load",
+    label="프로모션 운영 부하 / promo operational load (스타벅스 리유저블컵데이형)",
+    aliases=["프로모션", "판촉", "이벤트", "promo"],
+    root=Spec(
+        key="promo_operational_load",
+        label="판촉 이벤트가 매장을 마비시키지 않게 하는 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=SEVERE,
+        regulations=["근로기준법"],
+        requires=[
+            Spec("demand_forecast", "프로모션 수요 예측 기록", NodeKind.RECORD, grounding_tags=["promo_forecast"], owner_role="마케팅"),
+            Spec("staffing_record", "프로모션일 매장 인력 배치 기록", NodeKind.RECORD, grounding_tags=["staffing_log"], owner_role="매장운영"),
+            Spec("load_threshold_alarm", "매장 부하 임계 초과 알람 — 판단 개입", NodeKind.JUDGMENT, grounding_tags=["load_alarm"], owner_role="매장운영"),
+        ],
+    ),
+)
+
+_FS_LABOR_SAFETY = KpiTemplate(
+    key="labor_safety",
+    label="노무·안전 / labor & safety",
+    aliases=["노무", "근로시간", "안전교육", "labor"],
+    root=Spec(
+        key="labor_safety",
+        label="노무·안전 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=CATASTROPHIC,
+        regulations=["근로기준법", "산업안전보건법", "중대재해처벌법"],
+        requires=[
+            Spec("work_hours_record", "근로시간 기록", NodeKind.RECORD, grounding_tags=["work_hours"], owner_role="인사"),
+            Spec("safety_training_record", "안전보건교육 이수 기록", NodeKind.RECORD, grounding_tags=["safety_training"], owner_role="인사"),
+        ],
+    ),
+)
+
+FOODSERVICE_FRANCHISE = VerticalTemplate(
+    name="foodservice_franchise",
+    kpis={t.key: t for t in (_FS_STORE_HYGIENE,)},
+    obligations={t.key: t for t in (_FS_CONSUMER_SAFETY, _FS_PROMO_LOAD, _FS_LABOR_SAFETY, _PRIVACY, _FINANCIAL_CONTROL)},
 )
 
 
 VERTICALS: dict[str, VerticalTemplate] = {
     INJECTION_MOLDING.name: INJECTION_MOLDING,
     FOOD_MANUFACTURING.name: FOOD_MANUFACTURING,
+    FOODSERVICE_FRANCHISE.name: FOODSERVICE_FRANCHISE,
 }
