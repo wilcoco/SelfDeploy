@@ -78,6 +78,7 @@ MINOR = 0.25         # local inefficiency (default)
 EXPOSURE_WEIGHT: dict[str, float] = {
     "안전·생명": 1.0,
     "역사·사회": 1.0,
+    "윤리·품행": 0.9,   # 오너·임원 갑질·비위 — 한국 CEO 낙마의 최대 원인
     "정치": 0.9,
     "브랜드·여론": 0.8,
     "노무·ESG": 0.7,

@@ -38,6 +38,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
+from .categories import RISK_CATEGORIES, coverage
 from .clearance import ACTION_TYPES, clear_action
 from .sensitivity import LLMSensitivityChecker, check_campaign
 from .risk import by_exposure, by_regulation, escalate, risk_register
@@ -405,6 +406,20 @@ def cmd_clear_action(args: argparse.Namespace) -> int:
     return 0 if c.cleared else 1
 
 
+def cmd_categories(args: argparse.Namespace) -> int:
+    all_keys = {k for v in VERTICALS.values() for k in v.obligations}
+    print("대표이사 리스크 카테고리 (30년 사례 근거 — docs/CEO-RISK-CASES.md)\n")
+    for cat, status in coverage(all_keys):
+        print(f"[{cat.code}] {cat.name}   {status}")
+        print(f"     노출: {'/'.join(cat.exposure)}")
+        for c in cat.cases:
+            print(f"     · {c.name} ({c.year}) → {c.who_fell}")
+        if cat.obligations:
+            print(f"     의무: {', '.join(cat.obligations)}")
+        print()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -499,6 +514,9 @@ def build_parser() -> argparse.ArgumentParser:
     clr.add_argument("--financial", type=float, default=0.0, help="financial weight 0..1 (does NOT lower the risk floor)")
     clr.add_argument("--llm", action="store_true")
     clr.set_defaults(func=cmd_clear_action)
+
+    cats = sub.add_parser("categories", help="CEO-risk category taxonomy grounded in 30 years of cases")
+    cats.set_defaults(func=cmd_categories)
     return parser
 
 

@@ -274,6 +274,87 @@ _FINANCIAL_CONTROL = KpiTemplate(
 )
 
 
+# Empirically-derived obligations from 30 years of CEO-ousting cases (docs/CEO-RISK-CASES.md).
+# These are the categories that actually removed CEOs — especially in Korea — yet a
+# manufacturing-centric compliance view misses them entirely.
+
+_EXEC_CONDUCT = KpiTemplate(
+    key="exec_conduct",
+    label="오너·임원 품행 / owner-executive conduct (갑질·비위)",
+    aliases=["오너리스크", "갑질", "임원품행", "conduct"],
+    root=Spec(
+        key="exec_conduct",
+        label="오너·임원 개인 품행 통제 — 한국 CEO 낙마 최대 원인",
+        kind=NodeKind.OBLIGATION,
+        severity=CATASTROPHIC,   # 땅콩회항·미스터피자·한화·Easterbrook·Olympus·WWE
+        exposure=["윤리·품행", "브랜드·여론", "법규", "노무·ESG"],
+        requires=[
+            Spec("conduct_code_ack", "임원 행동강령 서약·교육 기록", NodeKind.RECORD, grounding_tags=["conduct_code"], owner_role="인사"),
+            Spec("conduct_hotline", "임원 비위 제보 핫라인 운영·처리 기록", NodeKind.RECORD, grounding_tags=["conduct_hotline"], owner_role="감사"),
+            Spec("gapjil_monitoring", "갑질·폭언 모니터링(제보·징계 기록)", NodeKind.RECORD, grounding_tags=["gapjil_log"], owner_role="인사"),
+            Spec("conflict_disclosure", "이해상충·겸직·회사자산 사적사용 공시", NodeKind.RECORD, grounding_tags=["conflict_disclosure"], owner_role="법무"),
+        ],
+    ),
+)
+
+_CONSUMER_HONESTY = KpiTemplate(
+    key="consumer_honesty",
+    label="소비자 기만·영업부정 / consumer honesty",
+    aliases=["허위광고", "밀어내기", "유령계좌", "기만"],
+    root=Spec(
+        key="consumer_honesty",
+        label="소비자 기만·영업 부정 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=SEVERE,        # 웰스파고 유령계좌·남양 불가리스 허위
+        exposure=["법규", "브랜드·여론", "재무"],
+        regulations=["표시·광고의 공정화에 관한 법률", "전자상거래법"],
+        requires=[
+            Spec("claim_substantiation", "광고·효능 표시 근거 검증 기록(허위광고 방지)", NodeKind.RECORD, grounding_tags=["claim_substantiation"], owner_role="마케팅"),
+            Spec("sales_consent", "판매·계약 고객 동의 진정성(유령계좌 방지)", NodeKind.RECORD, grounding_tags=["sales_consent"], owner_role="영업"),
+            Spec("quota_pressure_control", "무리한 영업할당 압박 통제", NodeKind.JUDGMENT, grounding_tags=["quota_control"], owner_role="인사"),
+        ],
+    ),
+)
+
+_PARTNER_FAIRNESS = KpiTemplate(
+    key="partner_fairness",
+    label="파트너·협력사 공정 / partner fairness (갑질)",
+    aliases=["대리점", "가맹점", "협력사", "밀어내기", "상생"],
+    root=Spec(
+        key="partner_fairness",
+        label="대리점·가맹점·협력사 갑질 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=SEVERE,        # 남양유업 대리점·미스터피자 가맹점
+        exposure=["법규", "브랜드·여론", "노무·ESG"],
+        regulations=["대리점거래의 공정화에 관한 법률", "가맹사업거래의 공정화에 관한 법률", "공정거래법"],
+        requires=[
+            Spec("no_forced_supply", "밀어내기(강매) 금지 통제·기록", NodeKind.RECORD, grounding_tags=["forced_supply_log"], owner_role="영업"),
+            Spec("partner_complaint_log", "협력사 불만·분쟁 처리 기록", NodeKind.RECORD, grounding_tags=["partner_complaint"], owner_role="상생"),
+            Spec("fair_contract_review", "협력사 계약 공정성 검토", NodeKind.RECORD, grounding_tags=["fair_contract"], owner_role="법무"),
+        ],
+    ),
+)
+
+_WORKPLACE_CULTURE = KpiTemplate(
+    key="workplace_culture",
+    label="조직문화·성비위 / workplace culture & harassment",
+    aliases=["직장내괴롭힘", "성희롱", "조직문화", "harassment"],
+    root=Spec(
+        key="workplace_culture",
+        label="조직문화·성비위 통제",
+        kind=NodeKind.OBLIGATION,
+        severity=CATASTROPHIC,  # Uber·WWE — 독성문화·성비위 무마
+        exposure=["노무·ESG", "윤리·품행", "브랜드·여론", "법규"],
+        regulations=["근로기준법(직장내 괴롭힘)", "남녀고용평등법"],
+        requires=[
+            Spec("harassment_reporting", "직장내 괴롭힘·성희롱 신고·조사 기록", NodeKind.RECORD, grounding_tags=["harassment_report"], owner_role="인사"),
+            Spec("culture_survey", "조직문화 익명 진단 기록", NodeKind.RECORD, grounding_tags=["culture_survey"], owner_role="인사"),
+            Spec("settlement_transparency", "합의금·무마 투명성(hush-money 방지)", NodeKind.JUDGMENT, grounding_tags=["settlement_log"], owner_role="감사"),
+        ],
+    ),
+)
+
+
 _BRAND_SENSITIVITY = KpiTemplate(
     key="brand_sensitivity",
     label="브랜드·홍보 정서 리스크 / marketing sensitivity (탱크데이형)",
@@ -339,7 +420,10 @@ _INJ_WORKER_SAFETY = KpiTemplate(
 INJECTION_MOLDING = VerticalTemplate(
     name="injection_molding",
     kpis={t.key: t for t in (_DEFECT_RATE, _DOWNTIME, _ON_TIME)},
-    obligations={t.key: t for t in (_INJ_PRODUCT_LIABILITY, _INJ_WORKER_SAFETY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL)},
+    obligations={t.key: t for t in (
+        _INJ_PRODUCT_LIABILITY, _INJ_WORKER_SAFETY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL,
+        _EXEC_CONDUCT, _WORKPLACE_CULTURE, _PARTNER_FAIRNESS,
+    )},
 )
 
 
@@ -453,7 +537,10 @@ _FOOD_CONSUMER_SAFETY = KpiTemplate(
 FOOD_MANUFACTURING = VerticalTemplate(
     name="food_manufacturing",
     kpis={t.key: t for t in (_SANITATION, _TRACEABILITY)},
-    obligations={t.key: t for t in (_FOOD_CONSUMER_SAFETY, _BRAND_SENSITIVITY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL)},
+    obligations={t.key: t for t in (
+        _FOOD_CONSUMER_SAFETY, _BRAND_SENSITIVITY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL,
+        _EXEC_CONDUCT, _WORKPLACE_CULTURE, _PARTNER_FAIRNESS, _CONSUMER_HONESTY,
+    )},
 )
 
 
@@ -534,7 +621,10 @@ _FS_LABOR_SAFETY = KpiTemplate(
 FOODSERVICE_FRANCHISE = VerticalTemplate(
     name="foodservice_franchise",
     kpis={t.key: t for t in (_FS_STORE_HYGIENE,)},
-    obligations={t.key: t for t in (_FS_CONSUMER_SAFETY, _BRAND_SENSITIVITY, _FS_PROMO_LOAD, _FS_LABOR_SAFETY, _PRIVACY, _FINANCIAL_CONTROL)},
+    obligations={t.key: t for t in (
+        _FS_CONSUMER_SAFETY, _BRAND_SENSITIVITY, _FS_PROMO_LOAD, _FS_LABOR_SAFETY, _PRIVACY, _FINANCIAL_CONTROL,
+        _EXEC_CONDUCT, _WORKPLACE_CULTURE, _PARTNER_FAIRNESS, _CONSUMER_HONESTY,
+    )},
 )
 
 
