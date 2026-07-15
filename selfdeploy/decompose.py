@@ -67,6 +67,28 @@ def build_graph(
     return graph
 
 
+def build_kpi_graph(vertical: VerticalTemplate) -> ContractGraph:
+    """Instantiate the whole performance surface — every KPI the vertical knows.
+
+    The management-loop counterpart of build_obligation_graph: when the CEO hasn't
+    voiced a specific requirement, propose the full performance grammar too.
+    """
+    graph = ContractGraph(root_id="kpi:root")
+    root = Contract(
+        id="kpi:root",
+        label=f"{vertical.name} 성과 관리 표면",
+        kind=NodeKind.REQUIREMENT,
+        severity=0.0,
+        provenance=Provenance.DOMAIN_INFERRED,
+    )
+    graph.add(root)
+    for key, tmpl in vertical.kpis.items():
+        sub = expand(tmpl, prefix=f"kpi:{key}")
+        graph.merge(sub)
+        root.requires.append(sub.root_id)
+    return graph
+
+
 def build_obligation_graph(vertical: VerticalTemplate) -> ContractGraph:
     """Instantiate the whole accountability surface — every obligation the company bears.
 

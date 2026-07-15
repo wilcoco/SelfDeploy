@@ -41,7 +41,24 @@ from .owners import (
 from .report import html_report, risk_register_html, text_report
 from .categories import RISK_CATEGORIES, RiskCategory, coverage
 from .clearance import ACTION_TYPES, ActionType, Clearance, clear_action
-from .manage import ManagedItem, cascade, management_surface, select, status_summary
+from .manage import (
+    ManagedItem,
+    cascade,
+    current_statuses,
+    management_surface,
+    rationale,
+    select,
+    status_summary,
+)
+from .state import (
+    Portfolio,
+    Tracked,
+    load_portfolio,
+    progress,
+    save_portfolio,
+    snapshot,
+    track,
+)
 from .sensitivity import Flag, LLMSensitivityChecker, check_campaign
 from .risk import (
     RiskItem,
@@ -128,6 +145,15 @@ __all__ = [
     "cascade",
     "status_summary",
     "ManagedItem",
+    "rationale",
+    "current_statuses",
+    "Portfolio",
+    "Tracked",
+    "load_portfolio",
+    "save_portfolio",
+    "track",
+    "snapshot",
+    "progress",
 ]
 
 __version__ = "0.0.1"

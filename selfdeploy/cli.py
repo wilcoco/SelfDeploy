@@ -40,7 +40,16 @@ from .owners import (
 from .report import html_report, risk_register_html, text_report
 from .categories import RISK_CATEGORIES, coverage
 from .clearance import ACTION_TYPES, clear_action
-from .manage import cascade, management_surface, select, status_summary
+from .manage import (
+    cascade,
+    current_statuses,
+    management_surface,
+    rationale,
+    select,
+    status_summary,
+)
+from .state import load_portfolio, progress, save_portfolio, snapshot, track
+from .state import Portfolio
 from .sensitivity import LLMSensitivityChecker, check_campaign
 from .risk import by_exposure, by_regulation, escalate, risk_register
 from .templates import VERTICALS
@@ -421,6 +430,56 @@ def cmd_categories(args: argparse.Namespace) -> int:
     return 0
 
 
+def _review_date(args: argparse.Namespace) -> str:
+    if getattr(args, "at", None):
+        return args.at
+    from datetime import date
+
+    return date.today().isoformat()
+
+
+def cmd_progress(args: argparse.Namespace) -> int:
+    pf = load_portfolio(args.state)
+    if pf is None:
+        print(f"포트폴리오 없음: {args.state} — 먼저 `manage --select … --track {args.state}`", file=sys.stderr)
+        return 2
+    vertical = VERTICALS.get(args.vertical or pf.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical or pf.vertical}", file=sys.stderr)
+        return 2
+    evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+    resolver = None
+    if args.org_chart:
+        resolver = org_chart_resolver(json.loads(Path(args.org_chart).read_text(encoding="utf-8")))
+
+    at = _review_date(args)
+    moved = snapshot(pf, current_statuses(vertical, evidence, resolver), at=at)
+    save_portfolio(pf, args.state)
+    summ = progress(pf)
+
+    print(f"④ 관리 — 리뷰 {len(pf.reviews)}회차 ({at}), 이번에 움직인 항목 {moved}건\n")
+    print(f"  추적 {summ.total}건 · 개선 {summ.improved}건 · 정체(2회+) {summ.stalled}건 · 사각지대 탈출률 {summ.graduation_rate:.0%}")
+    for st, n in sorted(summ.by_status.items()):
+        print(f"    {st}: {n}건")
+    stalled = [t for t in pf.items.values() if t.stalled_reviews >= 2]
+    if stalled:
+        print("\n  ⚠ 정체 — 다음 후속 개입 지점:")
+        for t in stalled:
+            print(f"    · [{t.category}] {_clean_line(t.label)} ({t.owner or '미지정'}) — {t.stalled_reviews}회 연속 {t.latest_status}")
+    improved = [t for t in pf.items.values() if t.improved]
+    if improved:
+        print("\n  ▲ 개선:")
+        for t in improved:
+            print(f"    · [{t.category}] {_clean_line(t.label)}: {t.first_status} → {t.latest_status}")
+
+    if args.html:
+        from .report import management_dashboard_html
+
+        Path(args.html).write_text(management_dashboard_html(vertical.name, pf, summ, at), encoding="utf-8")
+        print(f"\n대표 대시보드 → {args.html}", file=sys.stderr)
+    return 0
+
+
 def cmd_manage(args: argparse.Namespace) -> int:
     vertical = VERTICALS.get(args.vertical)
     if vertical is None:
@@ -447,6 +506,17 @@ def cmd_manage(args: argparse.Namespace) -> int:
 
     picked = select(surface, codes=codes, top=args.top)
     print(f"\n② 선택 — {len(picked)}건 " + (f"(카테고리 {', '.join(sorted(codes))})" if codes else f"(상위 {args.top})"))
+    if args.why:
+        for it in picked:
+            print(f"  · {_clean_line(it.label)}")
+            for r in rationale(it):
+                print(f"      ▸ {r}")
+
+    if args.track:
+        pf = load_portfolio(args.track) or Portfolio(vertical=vertical.name)
+        added = track(pf, picked, at=_review_date(args))
+        save_portfolio(pf, args.track)
+        print(f"\n(추적 시작: 신규 {added}건 → {args.track} — `selfdeploy progress`로 후속 리뷰)")
 
     print("\n③ 케스케이딩 — 오너에게 배분(비난 아닌 자원·도움):")
     for owner, items in sorted(cascade(picked).items(), key=lambda kv: -max(i.weight for i in kv[1])):
@@ -566,8 +636,20 @@ def build_parser() -> argparse.ArgumentParser:
     mng.add_argument("--select", help="category codes to steer, comma-separated (e.g. C4,C5,성과)")
     mng.add_argument("--top", type=int, default=None, help="steer the top-N weighted items")
     mng.add_argument("--org-chart", help="owner mapping JSON {role: person}")
+    mng.add_argument("--why", action="store_true", help="print the '왜 지금' rationale for each selected item")
+    mng.add_argument("--track", help="portfolio JSON path — start tracking the selection over time")
+    mng.add_argument("--at", default=None, help="review date (YYYY-MM-DD); default today")
     mng.add_argument("--llm", action="store_true")
     mng.set_defaults(func=cmd_manage)
+
+    prog = sub.add_parser("progress", help="④ 관리: snapshot tracked initiatives against current evidence, report the trajectory")
+    prog.add_argument("--state", required=True, help="portfolio JSON from manage --track")
+    prog.add_argument("--vertical", default=None, help="default: the portfolio's vertical")
+    prog.add_argument("--evidence-file")
+    prog.add_argument("--org-chart")
+    prog.add_argument("--at", default=None, help="review date (YYYY-MM-DD); default today")
+    prog.add_argument("--html", help="write the CEO management dashboard to this path")
+    prog.set_defaults(func=cmd_progress)
     return parser
 
 

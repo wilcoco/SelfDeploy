@@ -224,3 +224,92 @@ def risk_register_html(vertical_name: str, ceo: list, ops: list, top_n: int) -> 
   }}
   @media print {{ .board {{ margin: 0; max-width: none; }} h2 {{ break-after: avoid; }} tr {{ break-inside: avoid; }} }}
 </style>"""
+
+
+# --------------------------------------------------------------------------- #
+# CEO management dashboard: tracked initiatives as a trajectory over time
+# --------------------------------------------------------------------------- #
+
+_STATUS_COLOR = {
+    "관리중 (확보)": "#1a7f37",
+    "사람이 관리중": "#0969da",
+    "진행중 (미확정)": "#9a6700",
+    "사각지대 (미착수)": "#cf222e",
+}
+
+
+def management_dashboard_html(vertical_name: str, portfolio, summary, at: str) -> str:
+    """One-page CEO dashboard for the tracked portfolio: where each selected
+    initiative started, where it is now, and what has stalled."""
+
+    def tile(label: str, value: str, color: str = "#1f2328") -> str:
+        return (f'<div class="tile"><div class="tv" style="color:{color}">{value}</div>'
+                f'<div class="tl">{html.escape(label)}</div></div>')
+
+    tiles = "".join([
+        tile("추적 중", str(summary.total)),
+        tile("개선됨", str(summary.improved), "#1a7f37"),
+        tile("정체(2회+)", str(summary.stalled), "#cf222e" if summary.stalled else "#656d76"),
+        tile("사각지대 탈출률", f"{summary.graduation_rate:.0%}",
+             "#1a7f37" if summary.graduation_rate >= 0.5 else "#9a6700"),
+    ])
+
+    rows = []
+    for t in sorted(portfolio.items.values(), key=lambda x: (-x.stalled_reviews, x.category)):
+        f_c = _STATUS_COLOR.get(t.first_status, "#656d76")
+        l_c = _STATUS_COLOR.get(t.latest_status, "#656d76")
+        trend = ("<span class='up'>▲ 개선</span>" if t.improved
+                 else (f"<span class='stall'>■ 정체 {t.stalled_reviews}회</span>" if t.stalled_reviews >= 2
+                       else "<span class='flat'>─</span>"))
+        rows.append(
+            "<tr>"
+            f'<td class="cat">{html.escape(t.category)}</td>'
+            f'<td class="label">{html.escape(_clean(t.label))}</td>'
+            f'<td class="owner">{html.escape(t.owner or "미지정")}</td>'
+            f'<td><span class="st" style="color:{f_c}">{html.escape(t.first_status)}</span>'
+            f' → <span class="st" style="color:{l_c};font-weight:700">{html.escape(t.latest_status)}</span></td>'
+            f"<td>{trend}</td>"
+            "</tr>"
+        )
+    body = "".join(rows) or '<tr><td colspan="5">추적 중인 항목 없음 — manage --select … --track 로 시작</td></tr>'
+
+    return f"""<div class="board">
+<div class="head">
+  <h1>경영 관리 대시보드</h1>
+  <div class="meta">{html.escape(vertical_name)} · 리뷰 {len(portfolio.reviews)}회 · 기준일 {html.escape(at)}</div>
+</div>
+<div class="tiles">{tiles}</div>
+<table><thead><tr><th>카테고리</th><th>관리 항목</th><th>담당</th><th>시작 → 현재</th><th>추세</th></tr></thead>
+<tbody>{body}</tbody></table>
+<p class="foot">이 대시보드는 대표가 <b>선택한</b> 관리 항목의 궤적이다. 사각지대 → 진행중 → 관리중으로의 이동이 성과이고,
+정체 항목이 다음 후속 개입 지점이다. (방어용 노출 목록이 아니라 경영 조타 기록)</p>
+</div>
+<style>
+  :root {{ color-scheme: light dark; }}
+  @page {{ size: A4; margin: 14mm; }}
+  .board {{ font-family: ui-sans-serif, system-ui, "Apple SD Gothic Neo", sans-serif; max-width: 940px; margin: 1.5rem auto; padding: 0 1rem; color: #1f2328; }}
+  .head {{ border-bottom: 3px solid #1f2328; padding-bottom: .5rem; margin-bottom: 1rem; }}
+  h1 {{ font-size: 1.5rem; margin: 0; }}
+  .meta {{ color: #656d76; font-size: .85rem; margin-top: .25rem; }}
+  .tiles {{ display: flex; gap: .8rem; margin: 1rem 0 1.4rem; flex-wrap: wrap; }}
+  .tile {{ flex: 1; min-width: 130px; border: 1px solid #d0d7de; border-radius: 8px; padding: .7rem .9rem; }}
+  .tv {{ font-size: 1.5rem; font-weight: 800; }}
+  .tl {{ color: #656d76; font-size: .78rem; margin-top: .15rem; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: .84rem; }}
+  th {{ text-align: left; color: #656d76; font-weight: 600; border-bottom: 1px solid #d0d7de; padding: .3rem .4rem; }}
+  td {{ padding: .4rem .4rem; border-bottom: 1px solid #eaeef2; vertical-align: top; }}
+  .cat {{ white-space: nowrap; color: #656d76; font-size: .76rem; }}
+  .label {{ font-weight: 500; }}
+  .owner {{ white-space: nowrap; }}
+  .st {{ font-size: .78rem; }}
+  .up {{ color: #1a7f37; font-weight: 700; }}
+  .stall {{ color: #cf222e; font-weight: 700; }}
+  .flat {{ color: #656d76; }}
+  .foot {{ margin-top: 1.2rem; color: #656d76; font-size: .78rem; line-height: 1.5; border-top: 1px solid #d0d7de; padding-top: .6rem; }}
+  @media (prefers-color-scheme: dark) {{
+    .board {{ color: #e6edf3; }} .head {{ border-color: #e6edf3; }}
+    th {{ border-color: #30363d; }} td {{ border-color: #21262d; }}
+    .tile {{ border-color: #30363d; }} .foot {{ border-color: #30363d; }}
+  }}
+  @media print {{ .board {{ margin: 0; max-width: none; }} tr {{ break-inside: avoid; }} }}
+</style>"""

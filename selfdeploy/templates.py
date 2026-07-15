@@ -213,6 +213,59 @@ _ON_TIME = KpiTemplate(
 )
 
 
+# --- Cross-cutting performance KPIs (the P1~P3 lens; P4 operations live per-vertical) --- #
+
+_PROFITABILITY = KpiTemplate(
+    key="profitability",
+    label="제품별 수익성 / per-product margin",
+    aliases=["수익성", "마진", "수익율", "이익", "profitability", "margin"],
+    root=Spec(
+        key="profitability",
+        label="제품별 마진 = (매출 − 원가) / 매출",
+        kind=NodeKind.KPI,
+        requires=[
+            Spec("sales_ledger", "제품·채널별 매출 기록", NodeKind.RECORD, grounding_tags=["sales_ledger"], owner_role="영업"),
+            Spec("cost_allocation", "제품별 원가 배부 기준·기록 — 흔히 주먹구구(은닉층)", NodeKind.RECORD, grounding_tags=["cost_allocation"], owner_role="재무"),
+            Spec("discount_record", "할인·프로모션 차감 기록 (명목가 아닌 실수취가)", NodeKind.RECORD, grounding_tags=["price_ledger"], owner_role="영업"),
+        ],
+    ),
+)
+
+_COST_VISIBILITY = KpiTemplate(
+    key="cost_visibility",
+    label="비용 가시성 / cost & loss visibility",
+    aliases=["비용", "원가", "절감", "손실", "폐기", "cost"],
+    root=Spec(
+        key="cost_visibility",
+        label="비용·손실이 실측으로 잡히는가",
+        kind=NodeKind.KPI,
+        requires=[
+            Spec("expense_ledger", "비용 계정별 지출 기록", NodeKind.RECORD, grounding_tags=["expense_ledger"], owner_role="재무"),
+            Spec("purchase_price_trend", "구매 단가 추적 (공급사·품목별)", NodeKind.RECORD, grounding_tags=["purchase_price"], owner_role="구매"),
+            Spec("waste_cost_record", "손실·폐기·재작업 비용 기록 — 흔히 미집계(은닉층)", NodeKind.RECORD, grounding_tags=["waste_cost"], owner_role="생산"),
+        ],
+    ),
+)
+
+_SALES_GROWTH = KpiTemplate(
+    key="sales_growth",
+    label="매출 성장 / sales growth & pipeline",
+    aliases=["매출", "성장", "수주", "고객", "growth", "pipeline"],
+    root=Spec(
+        key="sales_growth",
+        label="매출 성장이 채널·고객 단위로 추적되는가",
+        kind=NodeKind.KPI,
+        requires=[
+            Spec("sales_trend", "기간별 매출 기록", NodeKind.RECORD, grounding_tags=["sales_ledger"], owner_role="영업"),
+            Spec("channel_split", "채널·고객별 매출 분해", NodeKind.RECORD, grounding_tags=["channel_split"], owner_role="영업"),
+            Spec("order_pipeline", "수주·파이프라인 기록 (선행지표)", NodeKind.RECORD, grounding_tags=["order_pipeline"], owner_role="영업"),
+        ],
+    ),
+)
+
+_PERF_KPIS = (_PROFITABILITY, _COST_VISIBILITY, _SALES_GROWTH)
+
+
 # --- Cross-cutting obligations (apply to almost any company; shared across verticals) --- #
 
 _PRIVACY = KpiTemplate(
@@ -419,7 +472,7 @@ _INJ_WORKER_SAFETY = KpiTemplate(
 
 INJECTION_MOLDING = VerticalTemplate(
     name="injection_molding",
-    kpis={t.key: t for t in (_DEFECT_RATE, _DOWNTIME, _ON_TIME)},
+    kpis={t.key: t for t in (_DEFECT_RATE, _DOWNTIME, _ON_TIME, *_PERF_KPIS)},
     obligations={t.key: t for t in (
         _INJ_PRODUCT_LIABILITY, _INJ_WORKER_SAFETY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL,
         _EXEC_CONDUCT, _WORKPLACE_CULTURE, _PARTNER_FAIRNESS,
@@ -536,7 +589,7 @@ _FOOD_CONSUMER_SAFETY = KpiTemplate(
 
 FOOD_MANUFACTURING = VerticalTemplate(
     name="food_manufacturing",
-    kpis={t.key: t for t in (_SANITATION, _TRACEABILITY)},
+    kpis={t.key: t for t in (_SANITATION, _TRACEABILITY, *_PERF_KPIS)},
     obligations={t.key: t for t in (
         _FOOD_CONSUMER_SAFETY, _BRAND_SENSITIVITY, _ENVIRONMENT, _PRIVACY, _FINANCIAL_CONTROL,
         _EXEC_CONDUCT, _WORKPLACE_CULTURE, _PARTNER_FAIRNESS, _CONSUMER_HONESTY,
@@ -620,7 +673,7 @@ _FS_LABOR_SAFETY = KpiTemplate(
 
 FOODSERVICE_FRANCHISE = VerticalTemplate(
     name="foodservice_franchise",
-    kpis={t.key: t for t in (_FS_STORE_HYGIENE,)},
+    kpis={t.key: t for t in (_FS_STORE_HYGIENE, *_PERF_KPIS)},
     obligations={t.key: t for t in (
         _FS_CONSUMER_SAFETY, _BRAND_SENSITIVITY, _FS_PROMO_LOAD, _FS_LABOR_SAFETY, _PRIVACY, _FINANCIAL_CONTROL,
         _EXEC_CONDUCT, _WORKPLACE_CULTURE, _PARTNER_FAIRNESS, _CONSUMER_HONESTY,

@@ -17,7 +17,7 @@ def test_surface_unifies_risk_and_performance_lenses():
     with_perf = _surface(requirement="위생 점검 준수율을 보고 싶다")
     codes = {i.category_code for i in with_perf}
     assert any(c.startswith("C") for c in codes)  # risk categories
-    assert "성과" in codes                          # performance KPI lens
+    assert any(c.startswith("P") for c in codes)  # performance categories (P1~P4)
 
 
 def test_surface_status_is_management_framed_not_defensive():

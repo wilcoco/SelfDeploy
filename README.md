@@ -140,6 +140,10 @@ python -m pytest -q
 - `collectors.py` — 말단 센싱 수집기 + 카탈로그 + 갭→센싱 플래너 (predictive-maintenance 어댑터)
 - `risk.py` — 대표 리스크 레지스터 (파장×미착지, 심각도 상속, 주의력 예산)
 - `owners.py` — 오너 해석 3옵션(조직도/수동/LLM) + 오너별 라우팅
+- `manage.py` — 경영 관리 루프(제안·선택·근거·케스케이딩) — 성과+리스크 통합
+- `state.py` — 관리 상태 지속성(포트폴리오·스냅샷·궤적·정체 탐지)
+- `sensitivity.py`/`clearance.py` — 사전 민감성 체크 + 화이트리스트 행위 게이트
+- `categories.py` — 30년 사례 근거 리스크(C1~C8)·성과(P1~P4) 카테고리
 - `llm.py` — 선택적 Claude 요구→KPI 매퍼 (격리된 비결정성 단계)
 - `report.py` — 텍스트/HTML 간극 지도
 - `cli.py` — analyze / questions / interview / classify / plan-sensing / collect / risk-register (부트스트랩·규제·이사회 HTML 포함)

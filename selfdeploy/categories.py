@@ -83,6 +83,39 @@ RISK_CATEGORIES: list[RiskCategory] = [
 ]
 
 
+# --------------------------------------------------------------------------- #
+# Performance categories — the other half of a management tool.
+# Risk tells the CEO what can end them; performance tells them what they're
+# actually hired to grow. Both sit on the same propose→select→cascade→manage loop.
+# --------------------------------------------------------------------------- #
+
+@dataclass
+class PerfCategory:
+    code: str
+    name: str
+    kpis: list[str] = field(default_factory=list)  # KPI template keys belonging here
+
+
+PERF_CATEGORIES: list[PerfCategory] = [
+    PerfCategory("P1", "수익성 (마진·수익율)", ["profitability"]),
+    PerfCategory("P2", "비용 효율 (원가·손실)", ["cost_visibility"]),
+    PerfCategory("P3", "성장 (매출·고객·수주)", ["sales_growth"]),
+    PerfCategory("P4", "운영 효율 (품질·가동·납기·위생)",
+                 ["defect_rate", "downtime", "on_time_delivery",
+                  "sanitation_compliance", "lot_traceability", "store_hygiene"]),
+]
+
+_KPI_TO_PERF: dict[str, tuple[str, str]] = {}
+for _pc in PERF_CATEGORIES:
+    for _k in _pc.kpis:
+        _KPI_TO_PERF[_k] = (_pc.code, _pc.name)
+
+
+def kpi_category(kpi_key: str) -> tuple[str, str]:
+    """Which performance category a KPI template belongs to."""
+    return _KPI_TO_PERF.get(kpi_key, ("P?", "기타 성과"))
+
+
 def coverage(all_obligation_keys: set[str]) -> list[tuple[RiskCategory, str]]:
     """Rate each category against the obligation keys that exist across our verticals."""
     out = []
