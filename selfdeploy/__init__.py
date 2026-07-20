@@ -39,6 +39,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
+from .ask import ANSWERED, ESCALATE, ROUTED, UNVERIFIED, AskResult, Resolution, ask, match_desire
 from .categories import RISK_CATEGORIES, RiskCategory, coverage
 from .clearance import ACTION_TYPES, ActionType, Clearance, clear_action
 from .manage import (
@@ -154,6 +155,10 @@ __all__ = [
     "track",
     "snapshot",
     "progress",
+    "ask",
+    "AskResult",
+    "Resolution",
+    "match_desire",
 ]
 
 __version__ = "0.0.1"

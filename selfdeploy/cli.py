@@ -38,6 +38,7 @@ from .owners import (
     template_resolver,
 )
 from .report import html_report, risk_register_html, text_report
+from .ask import ANSWERED, ESCALATE, ROUTED, UNVERIFIED, ask
 from .categories import RISK_CATEGORIES, coverage
 from .clearance import ACTION_TYPES, clear_action
 from .manage import (
@@ -430,6 +431,56 @@ def cmd_categories(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ask(args: argparse.Namespace) -> int:
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    if not args.desire:
+        print("무엇이 궁금하세요? --desire \"...\"", file=sys.stderr)
+        return 2
+    evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+    resolver = None
+    if args.org_chart:
+        resolver = org_chart_resolver(json.loads(Path(args.org_chart).read_text(encoding="utf-8")))
+    at = _review_date(args)
+
+    result = ask(args.desire, vertical, evidence, at=at, due_days=args.due_days,
+                 resolver=resolver, mapper=_mapper(args))
+
+    print(f'욕구: "{result.desire}"')
+    print(f"→ {result.verdict}\n")
+
+    answered = [r for r in result.resolutions if r.kind == ANSWERED]
+    routed = [r for r in result.resolutions if r.kind in (ROUTED, UNVERIFIED)]
+    if answered:
+        print("✓ 자동 답 (데이터로 착지):")
+        for r in answered:
+            print(f"    · {_clean_line(r.label)} — {r.detail}")
+    if routed:
+        print("\n⏳ 담당자에게 물음 (답 대기·추적):")
+        for r in routed:
+            tag = "미확인" if r.kind == UNVERIFIED else ""
+            print(f"    · [{r.owner}] {_clean_line(r.label)} — 기한 {r.due} {tag}".rstrip())
+
+    if args.track and routed:
+        pf = load_portfolio(args.track) or Portfolio(vertical=vertical.name)
+        items = [SimpleItem(r.contract_id, r.label, f"욕구:{result.desire[:20]}", r.owner,
+                            "진행중 (미확정)" if r.kind == UNVERIFIED else "사각지대 (미착수)")
+                 for r in routed]
+        added = track(pf, items, at=at)
+        save_portfolio(pf, args.track)
+        print(f"\n(추적 시작: {added}건 → {args.track} — `progress`로 후속)")
+    return 0
+
+
+class SimpleItem:
+    """Adapter so ask's routed resolutions can be tracked like ManagedItems."""
+    def __init__(self, contract_id, label, category, owner, status):
+        self.contract_id, self.label, self.category = contract_id, label, category
+        self.owner, self.status = owner, status
+
+
 def _review_date(args: argparse.Namespace) -> str:
     if getattr(args, "at", None):
         return args.at
@@ -627,6 +678,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     cats = sub.add_parser("categories", help="CEO-risk category taxonomy grounded in 30 years of cases")
     cats.set_defaults(func=cmd_categories)
+
+    a = sub.add_parser("ask", help="the primary door: express a desire → wire it (auto answer) or own it (assign + track)")
+    a.add_argument("--desire", help="what the CEO wants to know / not miss (natural language)")
+    a.add_argument("--vertical", default="foodservice_franchise")
+    a.add_argument("--evidence-file")
+    a.add_argument("--org-chart")
+    a.add_argument("--due-days", type=int, default=7)
+    a.add_argument("--at", default=None)
+    a.add_argument("--track", help="portfolio JSON path — track the routed questions until answered")
+    a.add_argument("--llm", action="store_true")
+    a.set_defaults(func=cmd_ask)
 
     mng = sub.add_parser("manage", help="CEO management loop: propose -> select -> cascade -> manage")
     mng.add_argument("--vertical", default="foodservice_franchise")
