@@ -445,8 +445,13 @@ def cmd_ask(args: argparse.Namespace) -> int:
         resolver = org_chart_resolver(json.loads(Path(args.org_chart).read_text(encoding="utf-8")))
     at = _review_date(args)
 
+    mapper = None
+    if getattr(args, "llm", False):
+        from .llm import ClaudeDesireMapper
+
+        mapper = ClaudeDesireMapper()
     result = ask(args.desire, vertical, evidence, at=at, due_days=args.due_days,
-                 resolver=resolver, mapper=_mapper(args))
+                 resolver=resolver, mapper=mapper)
 
     print(f'욕구: "{result.desire}"')
     print(f"→ {result.verdict}\n")
@@ -464,12 +469,12 @@ def cmd_ask(args: argparse.Namespace) -> int:
             print(f"    · [{r.owner}] {_clean_line(r.label)} — 기한 {r.due} {tag}".rstrip())
 
     if args.track and routed:
-        pf = load_portfolio(args.track) or Portfolio(vertical=vertical.name)
+        pf = load_portfolio(args.track, passphrase=getattr(args, 'passphrase', None)) or Portfolio(vertical=vertical.name)
         items = [SimpleItem(r.contract_id, r.label, f"욕구:{result.desire[:20]}", r.owner,
                             "진행중 (미확정)" if r.kind == UNVERIFIED else "사각지대 (미착수)")
                  for r in routed]
         added = track(pf, items, at=at)
-        save_portfolio(pf, args.track)
+        save_portfolio(pf, args.track, passphrase=getattr(args, 'passphrase', None))
         print(f"\n(추적 시작: {added}건 → {args.track} — `progress`로 후속)")
     return 0
 
@@ -481,6 +486,34 @@ class SimpleItem:
         self.owner, self.status = owner, status
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from .server import serve
+
+    vertical = VERTICALS.get(args.vertical)
+    if vertical is None:
+        print(f"unknown vertical: {args.vertical}", file=sys.stderr)
+        return 2
+    evidence = load_evidence(Path(args.evidence_file)) if args.evidence_file else Evidence()
+    resolver = None
+    if args.org_chart:
+        resolver = org_chart_resolver(json.loads(Path(args.org_chart).read_text(encoding="utf-8")))
+    mapper = None
+    if args.llm:
+        from .llm import ClaudeDesireMapper
+
+        mapper = ClaudeDesireMapper()
+
+    httpd = serve(vertical, evidence, port=args.port, resolver=resolver, mapper=mapper)
+    print(f"대표의 문 → http://127.0.0.1:{args.port}  (로컬 전용 — 데이터는 이 기계를 떠나지 않음)")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        httpd.server_close()
+    return 0
+
+
 def _review_date(args: argparse.Namespace) -> str:
     if getattr(args, "at", None):
         return args.at
@@ -490,7 +523,7 @@ def _review_date(args: argparse.Namespace) -> str:
 
 
 def cmd_progress(args: argparse.Namespace) -> int:
-    pf = load_portfolio(args.state)
+    pf = load_portfolio(args.state, passphrase=getattr(args, 'passphrase', None))
     if pf is None:
         print(f"포트폴리오 없음: {args.state} — 먼저 `manage --select … --track {args.state}`", file=sys.stderr)
         return 2
@@ -505,7 +538,7 @@ def cmd_progress(args: argparse.Namespace) -> int:
 
     at = _review_date(args)
     moved = snapshot(pf, current_statuses(vertical, evidence, resolver), at=at)
-    save_portfolio(pf, args.state)
+    save_portfolio(pf, args.state, passphrase=getattr(args, 'passphrase', None))
     summ = progress(pf)
 
     print(f"④ 관리 — 리뷰 {len(pf.reviews)}회차 ({at}), 이번에 움직인 항목 {moved}건\n")
@@ -564,9 +597,9 @@ def cmd_manage(args: argparse.Namespace) -> int:
                 print(f"      ▸ {r}")
 
     if args.track:
-        pf = load_portfolio(args.track) or Portfolio(vertical=vertical.name)
+        pf = load_portfolio(args.track, passphrase=getattr(args, 'passphrase', None)) or Portfolio(vertical=vertical.name)
         added = track(pf, picked, at=_review_date(args))
-        save_portfolio(pf, args.track)
+        save_portfolio(pf, args.track, passphrase=getattr(args, 'passphrase', None))
         print(f"\n(추적 시작: 신규 {added}건 → {args.track} — `selfdeploy progress`로 후속 리뷰)")
 
     print("\n③ 케스케이딩 — 오너에게 배분(비난 아닌 자원·도움):")
@@ -583,6 +616,8 @@ def cmd_manage(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="selfdeploy", description="Ought-first measurement-grounding engine")
+    parser.add_argument("--offline", action="store_true",
+                        help="block ALL network at the socket layer (local-first guarantee; LLM flags will raise)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     analyze = sub.add_parser("analyze", help="requirement -> ought-graph -> gap map")
@@ -679,6 +714,14 @@ def build_parser() -> argparse.ArgumentParser:
     cats = sub.add_parser("categories", help="CEO-risk category taxonomy grounded in 30 years of cases")
     cats.set_defaults(func=cmd_categories)
 
+    srv = sub.add_parser("serve", help="CEO first screen: local-only (127.0.0.1) mobile ask UI + daily brief")
+    srv.add_argument("--vertical", default="foodservice_franchise")
+    srv.add_argument("--evidence-file")
+    srv.add_argument("--org-chart")
+    srv.add_argument("--port", type=int, default=8787)
+    srv.add_argument("--llm", action="store_true", help="use Claude for desire routing (gated); off = keyword matching")
+    srv.set_defaults(func=cmd_serve)
+
     a = sub.add_parser("ask", help="the primary door: express a desire → wire it (auto answer) or own it (assign + track)")
     a.add_argument("--desire", help="what the CEO wants to know / not miss (natural language)")
     a.add_argument("--vertical", default="foodservice_franchise")
@@ -716,8 +759,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    import os
+
     parser = build_parser()
     args = parser.parse_args(argv)
+    # env-provided passphrase for encrypted portfolios (never a CLI arg — no shell history leaks)
+    args.passphrase = os.environ.get("SELFDEPLOY_PASSPHRASE")
+    if getattr(args, "offline", False):
+        from .security import offline_guard
+
+        with offline_guard():
+            return args.func(args)
     return args.func(args)
 
 

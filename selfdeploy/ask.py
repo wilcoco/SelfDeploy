@@ -93,8 +93,13 @@ def ask(
     resolver = resolver or template_resolver()
     kpis, obls = match_desire(vertical, desire)
 
-    if mapper is not None:  # optional LLM deepening of the KPI match
-        kpis = list(dict.fromkeys(kpis + [k for k in mapper.map(desire, vertical) if k in vertical.kpis]))
+    if mapper is not None:  # optional LLM deepening — union with keyword matches, keys stay gated
+        if hasattr(mapper, "map_desire"):  # ClaudeDesireMapper: KPI + obligation routing
+            mk, mo = mapper.map_desire(desire, vertical)
+            kpis = list(dict.fromkeys(kpis + [k for k in mk if k in vertical.kpis]))
+            obls = list(dict.fromkeys(obls + [k for k in mo if k in vertical.obligations]))
+        else:  # legacy KPI-only RequirementMapper
+            kpis = list(dict.fromkeys(kpis + [k for k in mapper.map(desire, vertical) if k in vertical.kpis]))
 
     result = AskResult(desire=desire, matched=kpis + obls)
 

@@ -40,7 +40,8 @@ from .owners import (
 )
 from .report import html_report, risk_register_html, text_report
 from .ask import ANSWERED, ESCALATE, ROUTED, UNVERIFIED, AskResult, Resolution, ask, match_desire
-from .categories import RISK_CATEGORIES, RiskCategory, coverage
+from .categories import PERF_CATEGORIES, RISK_CATEGORIES, PerfCategory, RiskCategory, coverage, kpi_category
+from .security import NetworkBlockedError, decrypt_json, encrypt_json, offline_guard
 from .clearance import ACTION_TYPES, ActionType, Clearance, clear_action
 from .manage import (
     ManagedItem,
@@ -159,6 +160,13 @@ __all__ = [
     "AskResult",
     "Resolution",
     "match_desire",
+    "offline_guard",
+    "NetworkBlockedError",
+    "encrypt_json",
+    "decrypt_json",
+    "PERF_CATEGORIES",
+    "PerfCategory",
+    "kpi_category",
 ]
 
 __version__ = "0.0.1"

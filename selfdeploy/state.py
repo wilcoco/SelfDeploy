@@ -67,11 +67,20 @@ class Portfolio:
     reviews: list[str] = field(default_factory=list)  # snapshot dates
 
 
-def load_portfolio(path: str | Path) -> Optional[Portfolio]:
+def load_portfolio(path: str | Path, passphrase: Optional[str] = None) -> Optional[Portfolio]:
     p = Path(path)
     if not p.exists():
         return None
-    data = json.loads(p.read_text(encoding="utf-8"))
+    raw = p.read_text(encoding="utf-8")
+
+    from .security import decrypt_json, is_encrypted_file
+
+    if is_encrypted_file(p):
+        if not passphrase:
+            raise ValueError("암호화된 포트폴리오 — passphrase가 필요함")
+        data = decrypt_json(raw, passphrase)
+    else:
+        data = json.loads(raw)
     items = {
         cid: Tracked(cid, d["label"], d["category"], d.get("owner"), d.get("history", []))
         for cid, d in data.get("items", {}).items()
@@ -79,14 +88,19 @@ def load_portfolio(path: str | Path) -> Optional[Portfolio]:
     return Portfolio(vertical=data["vertical"], items=items, reviews=data.get("reviews", []))
 
 
-def save_portfolio(portfolio: Portfolio, path: str | Path) -> None:
+def save_portfolio(portfolio: Portfolio, path: str | Path, passphrase: Optional[str] = None) -> None:
     data = {
         "vertical": portfolio.vertical,
         "reviews": portfolio.reviews,
         "items": {cid: {k: v for k, v in asdict(t).items() if k != "contract_id"}
                   for cid, t in portfolio.items.items()},
     }
-    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    if passphrase:
+        from .security import encrypt_json
+
+        Path(path).write_text(encrypt_json(data, passphrase), encoding="utf-8")
+    else:
+        Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def track(portfolio: Portfolio, selected, at: str) -> int:
